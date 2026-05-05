@@ -16,36 +16,53 @@
 Swag converts Go annotations to Swagger Documentation 2.0. We've created a variety of plugins for popular [Go web frameworks](#supported-web-frameworks). This allows you to quickly integrate with an existing Go project (using Swagger UI).
 
 ## Contents
- - [Getting started](#getting-started)
- - [Supported Web Frameworks](#supported-web-frameworks)
- - [How to use it with Gin](#how-to-use-it-with-gin)
- - [The swag formatter](#the-swag-formatter)
- - [Implementation Status](#implementation-status)
- - [Declarative Comments Format](#declarative-comments-format)
-	- [General API Info](#general-api-info)
-	- [API Operation](#api-operation)
-	- [Security](#security)
- - [Examples](#examples)
-	- [Descriptions over multiple lines](#descriptions-over-multiple-lines)
-	- [User defined structure with an array type](#user-defined-structure-with-an-array-type)
-	- [Function scoped struct declaration](#function-scoped-struct-declaration)
-	- [Model composition in response](#model-composition-in-response)
-        - [Add request headers](#add-request-headers)
-	- [Add response headers](#add-response-headers)
-	- [Use multiple path params](#use-multiple-path-params)
-	- [Example value of struct](#example-value-of-struct)
-	- [SchemaExample of body](#schemaexample-of-body)
-	- [Description of struct](#description-of-struct)
-	- [Use swaggertype tag to supported custom type](#use-swaggertype-tag-to-supported-custom-type)
-	- [Use global overrides to support a custom type](#use-global-overrides-to-support-a-custom-type)
-	- [Use swaggerignore tag to exclude a field](#use-swaggerignore-tag-to-exclude-a-field)
-	- [Add extension info to struct field](#add-extension-info-to-struct-field)
-	- [Rename model to display](#rename-model-to-display)
-	- [How to use security annotations](#how-to-use-security-annotations)
-	- [Add a description for enum items](#add-a-description-for-enum-items)
-	- [Generate only specific docs file types](#generate-only-specific-docs-file-types)
-    - [How to use Go generic types](#how-to-use-generics)
-- [About the Project](#about-the-project)
+- [swag](#swag)
+  - [Contents](#contents)
+  - [Getting started](#getting-started)
+  - [swag cli](#swag-cli)
+  - [Supported Web Frameworks](#supported-web-frameworks)
+  - [How to use it with Gin](#how-to-use-it-with-gin)
+  - [The swag formatter](#the-swag-formatter)
+  - [Implementation Status](#implementation-status)
+- [Declarative Comments Format](#declarative-comments-format)
+  - [General API Info](#general-api-info)
+    - [Using markdown descriptions](#using-markdown-descriptions)
+  - [Open API V3.1.0+](#open-api-v310)
+  - [API Operation](#api-operation)
+  - [Mime Types](#mime-types)
+  - [Param Type](#param-type)
+  - [Data Type](#data-type)
+  - [Security](#security)
+  - [Attribute](#attribute)
+    - [Available](#available)
+    - [Future](#future)
+  - [Examples](#examples)
+    - [Descriptions over multiple lines](#descriptions-over-multiple-lines)
+    - [User defined structure with an array type](#user-defined-structure-with-an-array-type)
+    - [Function scoped struct declaration](#function-scoped-struct-declaration)
+    - [Model composition in response](#model-composition-in-response)
+    - [Add headers in request](#add-request-headers)
+    - [Add headers in response](#add-a-headers-in-response)
+    - [Use multiple path params](#use-multiple-path-params)
+    - [Add multiple paths](#add-multiple-paths)
+    - [Example value of struct](#example-value-of-struct)
+    - [SchemaExample of body](#schemaexample-of-body)
+    - [Description of struct](#description-of-struct)
+    - [Use swaggertype tag to supported custom type](#use-swaggertype-tag-to-supported-custom-type)
+    - [Use global overrides to support a custom type](#use-global-overrides-to-support-a-custom-type)
+    - [Use swaggerignore tag to exclude a field](#use-swaggerignore-tag-to-exclude-a-field)
+    - [Add extension info to struct field](#add-extension-info-to-struct-field)
+    - [Rename model to display](#rename-model-to-display)
+    - [How to use security annotations](#how-to-use-security-annotations)
+    - [Add a description for enum items](#add-a-description-for-enum-items)
+    - [Generate only specific docs file types](#generate-only-specific-docs-file-types)
+        - [How to use Go generic types](#how-to-use-generics)
+    - [Change the default Go Template action delimiters](#change-the-default-go-template-action-delimiters)
+  - [About the Project](#about-the-project)
+  - [Contributors](#contributors)
+  - [Backers](#backers)
+  - [Sponsors](#sponsors)
+  - [License](#license)
 
 ## Getting started
 
@@ -53,7 +70,7 @@ Swag converts Go annotations to Swagger Documentation 2.0. We've created a varie
 
 2. Install swag by using:
 ```sh
-go install github.com/swaggo/swag/cmd/swag@latest
+go install github.com/swaggo/swag/v2/cmd/swag@latest
 ```
 To build from source you need [Go](https://golang.org/dl/) (1.19 or newer).
 
@@ -87,6 +104,7 @@ swag init
 
 ```sh
 swag init -h
+Swag version:  v2.0.0
 NAME:
    swag init - Create docs.go
 
@@ -113,12 +131,16 @@ OPTIONS:
    --instanceName value                   This parameter can be used to name different swagger document instances. It is optional.
    --overridesFile value                  File to read global type overrides from. (default: ".swaggo")
    --parseGoList                          Parse dependency via 'go list' (default: true)
+   --parseExtension value                 Parse only those operations that match given extension
    --tags value, -t value                 A comma-separated list of tags to filter the APIs for which the documentation is generated.Special case if the tag is prefixed with the '!' character then the APIs with that tag will be excluded
-   --templateDelims value, --td value     Provide custom delimiters for Go template generation. The format is leftDelim,rightDelim. For example: "[[,]]"
+   --v3.1                                 Generate OpenAPI V3.1 spec (default: false)
+   --templateDelims value, --td value     Provide custom delimeters for Go template generation. The format is leftDelim,rightDelim. For example: "[[,]]"
    --collectionFormat value, --cf value   Set default collection format (default: "csv")
    --state value                          Initial state for the state machine (default: ""), @HostState in root file, @State in other files
    --parseFuncBody                        Parse API info within body of functions in go files, disabled by default (default: false)
-   --help, -h                             show help (default: false)
+   --packageName --output                 A package name of docs.go, using output directory name by default (check --output option)
+   --collectionFormat value, --cf value   Set default collection format (default: "csv")
+   --help, -h                             show help
 ```
 
 ```bash
@@ -406,6 +428,7 @@ func (c *Controller) ListAccounts(ctx *gin.Context) {
 | schemes     | The transfer protocol for the operation that separated by spaces. | // @schemes http https |
 | externalDocs.description | Description of the external document. | // @externalDocs.description OpenAPI |
 | externalDocs.url         | URL of the external document. | // @externalDocs.url https://swagger.io/resources/open-api/ |
+| security    | Global security requirements that apply to all operations by default. | // @security ApiKeyAuth |
 | x-name      | The extension key, must be start by x- and take only json value | // @x-example-key {"key": "value"} |
 
 ### Using markdown descriptions
@@ -421,6 +444,14 @@ When a short string in your documentation is insufficient, or you need images, c
 | tag.description.markdown   | Description of the tag this is an alternative to tag.description. The description will be read from a file named like tagname.md  | // @tag.description.markdown         |
 | tag.x-name  | The extension key, must be start by x- and take only string value | // @x-example-key value |
 
+## Open API V3.1.0+
+
+The following annotations are only available if you set the -v3.1 flag in the CLI.
+
+| annotation  | description                                | example                         |
+|-------------|--------------------------------------------|---------------------------------|
+| servers.url       | The URL of a server| // @servers.url https://petstore.example.com/api/v1   |
+| servers.description       | The description of a server| // @servers.description Production API   |
 
 ## API Operation
 
@@ -448,7 +479,8 @@ When a short string in your documentation is insufficient, or you need images, c
 | x-name               | The extension key, must be start by x- and take only json value.                                                                                                                                  |
 | x-codeSample         | Optional Markdown usage. take `file` as parameter. This will then search for a file named like the summary in the given folder.                                                                   |
 | deprecated           | Mark endpoint as deprecated.                                                                                                                                                                      |
-
+| servers.url          | (Only for -v3.1 on the CLI) The URL of a server that will override the base one for this operation                                                                                                |
+| servers.description  | (Only for -v3.1 on the CLI) The description of a server that will override the base one for this operation                                                                                        |
 
 
 ## Mime Types
@@ -494,12 +526,13 @@ Besides that, `swag` also accepts aliases for some MIME Types as follows:
 ## Security
 | annotation | description | parameters | example |
 |------------|-------------|------------|---------|
-| securitydefinitions.basic  | [Basic](https://swagger.io/docs/specification/2-0/authentication/basic-authentication/) auth.  |                                   | // @securityDefinitions.basic BasicAuth                      |
-| securitydefinitions.apikey | [API key](https://swagger.io/docs/specification/2-0/authentication/api-keys/) auth.            | in, name, description                          | // @securityDefinitions.apikey ApiKeyAuth                    |
-| securitydefinitions.oauth2.application  | [OAuth2 application](https://swagger.io/docs/specification/authentication/oauth2/) auth.       | tokenUrl, scope, description                   | // @securitydefinitions.oauth2.application OAuth2Application |
-| securitydefinitions.oauth2.implicit     | [OAuth2 implicit](https://swagger.io/docs/specification/authentication/oauth2/) auth.          | authorizationUrl, scope, description           | // @securitydefinitions.oauth2.implicit OAuth2Implicit       |
-| securitydefinitions.oauth2.password     | [OAuth2 password](https://swagger.io/docs/specification/authentication/oauth2/) auth.          | tokenUrl, scope, description                   | // @securitydefinitions.oauth2.password OAuth2Password       |
-| securitydefinitions.oauth2.accessCode   | [OAuth2 access code](https://swagger.io/docs/specification/authentication/oauth2/) auth.       | tokenUrl, authorizationUrl, scope, description | // @securitydefinitions.oauth2.accessCode OAuth2AccessCode   |
+| securitydefinitions.basic               | [Basic](https://swagger.io/docs/specification/2-0/authentication/basic-authentication/) auth.             |                                                | // @securityDefinitions.basic BasicAuth                      |
+| securitydefinitions.apikey              | [API key](https://swagger.io/docs/specification/2-0/authentication/api-keys/) auth.                       | in, name, description                          | // @securityDefinitions.apikey ApiKeyAuth                    |
+| securitydefinitions.oauth2.application  | [OAuth2 application](https://swagger.io/docs/specification/authentication/oauth2/) auth.                  | tokenUrl, scope, description                   | // @securitydefinitions.oauth2.application OAuth2Application |
+| securitydefinitions.oauth2.implicit     | [OAuth2 implicit](https://swagger.io/docs/specification/authentication/oauth2/) auth.                     | authorizationUrl, scope, description           | // @securitydefinitions.oauth2.implicit OAuth2Implicit       |
+| securitydefinitions.oauth2.password     | [OAuth2 password](https://swagger.io/docs/specification/authentication/oauth2/) auth.                     | tokenUrl, scope, description                   | // @securitydefinitions.oauth2.password OAuth2Password       |
+| securitydefinitions.oauth2.accessCode   | [OAuth2 access code](https://swagger.io/docs/specification/authentication/oauth2/) auth.                  | tokenUrl, authorizationUrl, scope, description | // @securitydefinitions.oauth2.accessCode OAuth2AccessCode   |
+| securitydefinitions.bearerauth          | [Bearer Authentication](https://swagger.io/docs/specification/authentication/bearer-authentication/) auth. supported in Swagger v3.x|                                                | // @securitydefinitions.bearerauth BearerAuth                |
 
 
 | parameters annotation           | example                                                                 |
@@ -687,6 +720,17 @@ type DeepObject struct { //in `proto` package
 // ...
 // @Router /examples/groups/{group_id}/user/{user_id}/address [put]
 // @Router /examples/user/{user_id}/address [put]
+```
+
+
+
+### Use multiple body params (OpenAPI 3.0) `--v3.1`
+
+```go
+// ...
+// @Param Cat body web.Cat true "Cat body"
+// @Param Dog body web.Dog true "Dog body"
+// ...
 ```
 
 ### Example value of struct
@@ -890,7 +934,12 @@ General API info.
 // @tokenUrl https://example.com/oauth/token
 // @scope.write Grants write access
 // @scope.admin Grants read and write access to administrative information
+
+// @security BasicAuth
+// @security OAuth2Application
 ```
+
+To set global security requirements that apply to all operations by default, use the `@security` annotation in your general API info. This creates a top-level `security` array in the generated OpenAPI specification.
 
 Each API operation.
 

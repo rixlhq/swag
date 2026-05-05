@@ -371,7 +371,7 @@ func TestParser_ParseGeneralApiInfoExtensions(t *testing.T) {
 	t.Run("Test invalid extension value", func(t *testing.T) {
 		t.Parallel()
 
-		expected := "annotation @x-google-endpoints need a valid json value"
+		expected := "annotation @x-google-endpoints need a valid json value. error: invalid character ':' after array element"
 		gopath := os.Getenv("GOPATH")
 		assert.NotNil(t, gopath)
 
@@ -2197,9 +2197,9 @@ func TestParseTypeOverrides(t *testing.T) {
 
 	searchDir := "testdata/global_override"
 	p := New(SetOverrides(map[string]string{
-		"github.com/swaggo/swag/testdata/global_override/types.Application":  "string",
-		"github.com/swaggo/swag/testdata/global_override/types.Application2": "github.com/swaggo/swag/testdata/global_override/othertypes.Application",
-		"github.com/swaggo/swag/testdata/global_override/types.ShouldSkip":   "",
+		"github.com/swaggo/swag/v2/testdata/global_override/types.Application":  "string",
+		"github.com/swaggo/swag/v2/testdata/global_override/types.Application2": "github.com/swaggo/swag/v2/testdata/global_override/othertypes.Application",
+		"github.com/swaggo/swag/v2/testdata/global_override/types.ShouldSkip":   "",
 	}))
 	err := p.ParseAPI(searchDir, mainAPIFile, defaultParseDepth)
 	assert.NoError(t, err)
@@ -3130,6 +3130,22 @@ func TestParseTagMarkdownDescription(t *testing.T) {
 	apes := p.swagger.Tags[2]
 	if apes.TagProps.Description == "" {
 		t.Error("Failed to parse tag description markdown file")
+	}
+}
+
+func TestApiParseTag_Filtered(t *testing.T) {
+	t.Parallel()
+
+	searchDir := "testdata/tags"
+	p := New(SetMarkdownFileDirectory(searchDir), SetTags("dogs,apes"))
+	p.PropNamingStrategy = PascalCase
+
+	err := p.ParseAPI(searchDir, mainAPIFile, defaultParseDepth)
+	assert.NoError(t, err)
+
+	if assert.Len(t, p.swagger.Tags, 2) {
+		assert.Equal(t, "dogs", p.swagger.Tags[0].TagProps.Name)
+		assert.Equal(t, "apes", p.swagger.Tags[1].TagProps.Name)
 	}
 }
 
@@ -4437,21 +4453,21 @@ func TestParser_skipPackageByPrefix(t *testing.T) {
 
 	parser := New()
 
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/cmd"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/gen"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2/cmd"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2/gen"))
 
-	parser = New(SetPackagePrefix("github.com/swaggo/swag/cmd"))
+	parser = New(SetPackagePrefix("github.com/swaggo/swag/v2/cmd"))
 
-	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/cmd"))
-	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag/gen"))
+	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2/cmd"))
+	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2/gen"))
 
-	parser = New(SetPackagePrefix("github.com/swaggo/swag/cmd,github.com/swaggo/swag/gen"))
+	parser = New(SetPackagePrefix("github.com/swaggo/swag/v2/cmd,github.com/swaggo/swag/v2/gen"))
 
-	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/cmd"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/gen"))
+	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2/cmd"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/v2/gen"))
 }
 
 func TestParser_ParseRouterApiInFuncBody(t *testing.T) {

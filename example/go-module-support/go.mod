@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/swaggo/examples v0.0.0-20190624100559-f57286ab550c
-	github.com/swaggo/swag v1.8.1
+	github.com/swaggo/swag/v2 v2.0.0
 )
 
 require (

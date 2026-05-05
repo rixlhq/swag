@@ -13,7 +13,7 @@ import (
 	"github.com/go-openapi/spec"
 )
 
-var _ FieldParser = &tagBaseFieldParser{p: nil, field: nil, tag: ""}
+var _ FieldParser = (*tagBaseFieldParser)(nil)
 
 const (
 	requiredLabel    = "required"
@@ -196,6 +196,7 @@ type structField struct {
 	enums        []any
 	enumVarNames []any
 	unique       bool
+	pattern      string
 }
 
 // splitNotWrapped slices s into all substrings separated by sep if sep is not
@@ -361,6 +362,11 @@ func (ps *tagBaseFieldParser) complementSchema(schema *spec.Schema, types []stri
 		if minLength != nil {
 			field.minLength = minLength
 		}
+
+		pattern, ok := ps.tag.Lookup(patternTag)
+		if ok {
+			field.pattern = pattern
+		}
 	}
 
 	// json:"name,string" or json:",string"
@@ -470,6 +476,7 @@ func (ps *tagBaseFieldParser) complementSchema(schema *spec.Schema, types []stri
 		schema.MaxItems = field.maxItems
 		schema.MinItems = field.minItems
 		schema.UniqueItems = field.unique
+		schema.Pattern = field.pattern
 
 		if schema.Items != nil {
 			eleSchema = schema.Items.Schema
@@ -484,6 +491,7 @@ func (ps *tagBaseFieldParser) complementSchema(schema *spec.Schema, types []stri
 	eleSchema.MaxLength = field.maxLength
 	eleSchema.MinLength = field.minLength
 	eleSchema.Enum = field.enums
+	eleSchema.Pattern = field.pattern
 
 	return nil
 }
@@ -558,6 +566,7 @@ func (ps *tagBaseFieldParser) IsRequired() (bool, error) {
 }
 
 func parseValidTags(validTag string, sf *structField) {
+
 	// `validate:"required,max=10,min=1"`
 	// ps. required checked by IsRequired().
 	for _, val := range strings.Split(validTag, ",") {
@@ -580,6 +589,10 @@ func parseValidTags(validTag string, sf *structField) {
 		case "min", "gte":
 			sf.setMin(valValue)
 		case "oneof":
+			if strings.Contains(validTag, "swaggerIgnore") {
+				continue
+			}
+
 			sf.setOneOf(valValue)
 		case "unique":
 			if sf.schemaType == ARRAY {

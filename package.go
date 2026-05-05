@@ -103,7 +103,6 @@ func (pkg *PackageDefinitions) evaluateConstValue(file *ast.File, iota int, expr
 	case *ast.BasicLit:
 		switch valueExpr.Kind {
 		case token.INT:
-			//a basic literal integer is int type in default, or must have an explicit converting type in front
 			if x, err := strconv.ParseInt(valueExpr.Value, 0, 64); err == nil {
 				return int(x), nil
 			} else if x, err := strconv.ParseUint(valueExpr.Value, 0, 64); err == nil {
