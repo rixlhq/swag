@@ -686,7 +686,7 @@ func serializationFromCommentV3(commentLine, objectType, location string) (style
 	explode, hasExplode := parseExplodeAttribute(commentLine)
 	if hasStyle {
 		if !hasExplode {
-			explode = defaultExplodeForStyle(style)
+			explode = style == "form"
 		}
 		return style, explode, true
 	}
@@ -745,19 +745,6 @@ func parseExplodeAttribute(commentLine string) (bool, bool) {
 	return strings.EqualFold(attr, "true"), true
 }
 
-func parseAllowReservedAttribute(commentLine string) (bool, bool) {
-	attr, err := findAttr(regexAttributes[allowReservedTag], commentLine)
-	if err != nil || attr == "" {
-		return false, false
-	}
-
-	return strings.EqualFold(attr, "true"), true
-}
-
-func defaultExplodeForStyle(style string) bool {
-	return style == "form"
-}
-
 func isDefaultAcceptSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
 	if schema == nil || schema.Ref != nil || schema.Spec == nil || schema.Spec.Type == nil {
 		return false
@@ -787,86 +774,72 @@ func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string
 	}
 
 	schemaType = TransToValidSchemeType(schemaType)
-
-	for attrKey, re := range regexAttributes {
-		attr, err := findAttr(re, comment)
-		if err != nil {
-			continue
-		}
-
+	return forEachCommentAttribute(comment, func(attrKey, attr string) error {
 		switch attrKey {
 		case enumsTag:
-			err = setEnumParamV3(param.Schema.Spec, attr, objectType, schemaType)
+			return setEnumParamV3(param.Schema.Spec, attr, objectType, schemaType)
 		case minimumTag, maximumTag:
-			err = setNumberParamV3(param.Schema.Spec, attrKey, schemaType, attr, comment)
+			return setNumberParamV3(param.Schema.Spec, attrKey, schemaType, attr, comment)
 		case defaultTag:
-			err = setDefaultV3(param.Schema.Spec, schemaType, attr)
+			return setDefaultV3(param.Schema.Spec, schemaType, attr)
 		case minLengthTag, maxLengthTag:
-			err = setStringParamV3(param.Schema.Spec, attrKey, schemaType, attr, comment)
+			return setStringParamV3(param.Schema.Spec, attrKey, schemaType, attr, comment)
 		case formatTag:
 			param.Schema.Spec.Format = attr
 		case exampleTag:
-			val, err := defineType(schemaType, attr)
-			if err != nil {
-				continue // Don't set a example value if it's not valid
-			}
-
-			param.Example = val
+			return setExampleParameterV3(param, schemaType, attr)
 		case schemaExampleTag:
-			err = setSchemaExampleV3(param.Schema.Spec, schemaType, attr)
+			return setSchemaExampleV3(param.Schema.Spec, schemaType, attr)
 		case extensionsTag:
 			param.Schema.Spec.Extensions = setExtensionParam(attr)
 		case collectionFormatTag:
-			err = setCollectionFormatParamV3(param, attrKey, objectType, attr, comment)
+			return setCollectionFormatParamV3(param, attrKey, objectType, attr, comment)
 		case styleTag:
-			err = setStyleParamV3(param, attrKey, objectType, attr, comment)
+			return setStyleParamV3(param, attrKey, objectType, attr, comment)
 		case explodeTag:
-			err = setExplodeParamV3(param, attrKey, objectType, attr, comment)
+			return setExplodeParamV3(param, attrKey, objectType, attr, comment)
 		case allowReservedTag:
-			err = setAllowReservedParamV3(param, attrKey, attr)
+			return setAllowReservedParamV3(param, attrKey, attr)
 		}
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType string, param *spec.Schema) error {
 	schemaType = TransToValidSchemeType(schemaType)
+	return forEachCommentAttribute(comment, func(attrKey, attr string) error {
+		switch attrKey {
+		case enumsTag:
+			return setEnumParamV3(param, attr, objectType, schemaType)
+		case minimumTag, maximumTag:
+			return setNumberParamV3(param, attrKey, schemaType, attr, comment)
+		case defaultTag:
+			return setDefaultV3(param, schemaType, attr)
+		case minLengthTag, maxLengthTag:
+			return setStringParamV3(param, attrKey, schemaType, attr, comment)
+		case formatTag:
+			param.Format = attr
+		case exampleTag:
+			return setSchemaExampleV3(param, schemaType, attr)
+		case schemaExampleTag:
+			return setSchemaExampleV3(param, schemaType, attr)
+		case extensionsTag:
+			param.Extensions = setExtensionParam(attr)
+		}
+		return nil
+	})
+}
 
+func forEachCommentAttribute(comment string, fn func(attrKey, attr string) error) error {
 	for attrKey, re := range regexAttributes {
 		attr, err := findAttr(re, comment)
 		if err != nil {
 			continue
 		}
-
-		switch attrKey {
-		case enumsTag:
-			err = setEnumParamV3(param, attr, objectType, schemaType)
-		case minimumTag, maximumTag:
-			err = setNumberParamV3(param, attrKey, schemaType, attr, comment)
-		case defaultTag:
-			err = setDefaultV3(param, schemaType, attr)
-		case minLengthTag, maxLengthTag:
-			err = setStringParamV3(param, attrKey, schemaType, attr, comment)
-		case formatTag:
-			param.Format = attr
-		case exampleTag:
-			err = setSchemaExampleV3(param, schemaType, attr)
-		case schemaExampleTag:
-			err = setSchemaExampleV3(param, schemaType, attr)
-		case extensionsTag:
-			param.Extensions = setExtensionParam(attr)
-		}
-
-		if err != nil {
+		if err := fn(attrKey, attr); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
