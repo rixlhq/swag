@@ -2139,6 +2139,7 @@ func TestParseAcceptCommentV3(t *testing.T) {
 
 	assert.Equal(t, &typeObject, content["application/json"].Spec.Schema.Spec.Type)
 	assert.Equal(t, &typeObject, content["text/xml"].Spec.Schema.Spec.Type)
+	assert.Equal(t, &typeObject, content["application/x-www-form-urlencoded"].Spec.Schema.Spec.Type)
 	assert.Equal(t, &typeString, content["image/png"].Spec.Schema.Spec.Type)
 	assert.Equal(t, "binary", content["image/png"].Spec.Schema.Spec.Format)
 }

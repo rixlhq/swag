@@ -19,6 +19,44 @@ type parsedDiscriminator struct {
 	mapping      map[string]string // nil when not specified
 }
 
+const (
+	mediaTypeJSON                  = "application/json"
+	mediaTypeMultipartForm         = "multipart/form-data"
+	mediaTypeFormURLEncoded        = "application/x-www-form-urlencoded"
+	mediaTypeTextXML               = "text/xml"
+	mediaTypeTextPlain             = "text/plain"
+	mediaTypeOctetStream           = "application/octet-stream"
+	mediaTypePDF                   = "application/pdf"
+	mediaTypeMSExcel               = "application/msexcel"
+	mediaTypeZIP                   = "application/zip"
+	mediaTypePNG                   = "image/png"
+	mediaTypeJPEG                  = "image/jpeg"
+	mediaTypeGIF                   = "image/gif"
+	mediaTypeWordDocument          = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	mediaTypeSpreadsheetDocument   = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	mediaTypePresentationDocument  = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+)
+
+var objectLikeBodyMediaTypes = map[string]struct{}{
+	mediaTypeJSON:           {},
+	mediaTypeMultipartForm:  {},
+	mediaTypeFormURLEncoded: {},
+	mediaTypeTextXML:        {},
+}
+
+var binaryMediaTypes = map[string]struct{}{
+	mediaTypePNG:                  {},
+	mediaTypeJPEG:                 {},
+	mediaTypeGIF:                  {},
+	mediaTypeOctetStream:          {},
+	mediaTypePDF:                  {},
+	mediaTypeMSExcel:              {},
+	mediaTypeZIP:                  {},
+	mediaTypeWordDocument:         {},
+	mediaTypeSpreadsheetDocument:  {},
+	mediaTypePresentationDocument: {},
+}
+
 // OperationV3 describes a single API operation on a path.
 // For more information: https://github.com/swaggo/swag#api-operation
 type OperationV3 struct {
@@ -179,28 +217,7 @@ func (o *OperationV3) ParseAcceptComment(commentLine string) error {
 		}
 
 		mediaType := spec.NewMediaType()
-		schema := spec.NewSchemaSpec()
-
-		switch value {
-		case "application/json", "multipart/form-data", "text/xml":
-			schema.Spec.Type = &spec.SingleOrArray[string]{OBJECT}
-		case "image/png",
-			"image/jpeg",
-			"image/gif",
-			"application/octet-stream",
-			"application/pdf",
-			"application/msexcel",
-			"application/zip",
-			"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-			"application/vnd.openxmlformats-officedocument.presentationml.presentation":
-			schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
-			schema.Spec.Format = "binary"
-		default:
-			schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
-		}
-
-		mediaType.Spec.Schema = schema
+		mediaType.Spec.Schema = defaultSchemaForMediaTypeV3(value)
 		o.RequestBody.Spec.Spec.Content[value] = mediaType
 	}
 
@@ -257,28 +274,7 @@ func (o *OperationV3) ProcessProduceComment() error {
 			}
 
 			mediaType := spec.NewMediaType()
-			schema := spec.NewSchemaSpec()
-
-			switch value {
-			case "application/json", "multipart/form-data", "text/xml":
-				schema.Spec.Type = &spec.SingleOrArray[string]{OBJECT}
-			case "image/png",
-				"image/jpeg",
-				"image/gif",
-				"application/octet-stream",
-				"application/pdf",
-				"application/msexcel",
-				"application/zip",
-				"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-				"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-				"application/vnd.openxmlformats-officedocument.presentationml.presentation":
-				schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
-				schema.Spec.Format = "binary"
-			default:
-				schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
-			}
-
-			mediaType.Spec.Schema = schema
+			mediaType.Spec.Schema = defaultSchemaForMediaTypeV3(value)
 
 			if response.Spec.Spec.Content == nil {
 				response.Spec.Spec.Content = make(map[string]*spec.Extendable[spec.MediaType])
@@ -290,6 +286,23 @@ func (o *OperationV3) ProcessProduceComment() error {
 	}
 
 	return nil
+}
+
+func defaultSchemaForMediaTypeV3(value string) *spec.RefOrSpec[spec.Schema] {
+	schema := spec.NewSchemaSpec()
+
+	if _, ok := objectLikeBodyMediaTypes[value]; ok {
+		schema.Spec.Type = &spec.SingleOrArray[string]{OBJECT}
+		return schema
+	}
+	if _, ok := binaryMediaTypes[value]; ok {
+		schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
+		schema.Spec.Format = "binary"
+		return schema
+	}
+
+	schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
+	return schema
 }
 
 // parseMimeTypeList parses a list of MIME Types for a comment like
@@ -332,26 +345,12 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	name := matches[1]
 	paramType := matches[2]
 	refType := TransToValidSchemeType(matches[3])
-
-	// Detect refType
-	objectType := OBJECT
-
-	if strings.HasPrefix(refType, "[]") {
-		objectType = ARRAY
-		refType = strings.TrimPrefix(refType, "[]")
-		refType = TransToValidSchemeType(refType)
-	} else if IsPrimitiveType(refType) ||
-		paramType == "formData" && refType == "file" {
-		objectType = PRIMITIVE
-	}
+	objectType, refType := detectParamTypeV3(paramType, refType)
 
 	var enums []interface{}
 	if !IsPrimitiveType(refType) {
 		schema, _ := o.parser.getTypeSchemaV3(refType, astFile, false)
 		if schema != nil && schema.Spec != nil && schema.Spec.Enum != nil {
-			// schema.Spec.Type != ARRAY
-			fmt.Println(schema.Spec.Type)
-
 			if objectType == OBJECT {
 				objectType = PRIMITIVE
 			}
@@ -364,105 +363,26 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	required := requiredText == "true" || requiredText == requiredLabel
 	description := matches[5]
 
-	param := createParameterV3(paramType, description, name, objectType, refType, required, enums, o.parser.collectionFormatInQuery)
-
 	switch paramType {
 	case "path", "header":
-		switch objectType {
-		case ARRAY:
-			if !IsPrimitiveType(refType) {
-				return fmt.Errorf("%s is not supported array type for %s", refType, paramType)
-			}
-		case OBJECT:
-			return fmt.Errorf("%s is not supported type for %s", refType, paramType)
+		if err := validateSimpleParamTypeV3(paramType, objectType, refType); err != nil {
+			return err
 		}
 	case "query":
-		switch objectType {
-		case ARRAY:
-			if !IsPrimitiveType(refType) && !(refType == "file" && paramType == "formData") {
-				return fmt.Errorf("%s is not supported array type for %s", refType, paramType)
-			}
-		case PRIMITIVE:
-			break
-		case OBJECT:
-			schema, err := o.parser.getTypeSchemaV3(refType, astFile, false)
-			if err != nil {
-				return err
-			}
-
-			if len(schema.Spec.Properties) == 0 {
-				return nil
-			}
-
-			for name, item := range schema.Spec.Properties {
-				prop := item.Spec
-				if len(*prop.Type) == 0 {
-					continue
-				}
-
-				itemParam := param // Avoid shadowed variable which could cause side effects to o.Operation.Parameters
-
-				switch {
-				case (*prop.Type)[0] == ARRAY &&
-					prop.Items.Schema != nil &&
-					len(*prop.Items.Schema.Spec.Type) > 0 &&
-					IsSimplePrimitiveType((*prop.Items.Schema.Spec.Type)[0]):
-
-					itemParam = createParameterV3(paramType, prop.Description, name, (*prop.Type)[0], (*prop.Items.Schema.Spec.Type)[0], findInSlice(schema.Spec.Required, name), enums, o.parser.collectionFormatInQuery)
-
-				case IsSimplePrimitiveType((*prop.Type)[0]):
-					itemParam = createParameterV3(paramType, prop.Description, name, PRIMITIVE, (*prop.Type)[0], findInSlice(schema.Spec.Required, name), enums, o.parser.collectionFormatInQuery)
-				default:
-					o.parser.debug.Printf("skip field [%s] in %s is not supported type for %s", name, refType, paramType)
-
-					continue
-				}
-
-				itemParam.Schema.Spec = prop
-
-				listItem := &spec.RefOrSpec[spec.Extendable[spec.Parameter]]{
-					Spec: &spec.Extendable[spec.Parameter]{
-						Spec: &itemParam,
-					},
-				}
-
-				o.Operation.Parameters = append(o.Operation.Parameters, listItem)
-			}
-
-			return nil
+		if objectType == OBJECT {
+			return o.expandQueryObjectParamsV3(refType, paramType, enums, astFile)
+		}
+		if err := validateSimpleParamTypeV3(paramType, objectType, refType); err != nil {
+			return err
 		}
 	case "body", "formData":
-		if objectType == PRIMITIVE {
-			schema := PrimitiveSchemaV3(refType)
-
-			err := o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec)
-			if err != nil {
-				return err
-			}
-
-			o.fillRequestBody(name, schema, required, description, true, paramType == "formData", formDataEncodingFromComment(commentLine, objectType))
-
-			return nil
-
-		}
-
-		schema, err := o.parseAPIObjectSchema(commentLine, objectType, refType, astFile)
-		if err != nil {
-			return err
-		}
-
-		err = o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec)
-		if err != nil {
-			return err
-		}
-		o.fillRequestBody(name, schema, required, description, false, paramType == "formData", formDataEncodingFromComment(commentLine, objectType))
-
-		return nil
+		return o.handleRequestBodyParamV3(commentLine, name, paramType, objectType, refType, required, description, astFile)
 
 	default:
 		return fmt.Errorf("%s is not supported paramType", paramType)
 	}
 
+	param := createParameterV3(paramType, description, name, objectType, refType, required, enums, o.parser.collectionFormatInQuery)
 	err := o.parseParamAttribute(commentLine, objectType, refType, &param)
 	if err != nil {
 		return err
@@ -476,6 +396,108 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	o.Operation.Parameters = append(o.Operation.Parameters, item)
 
 	return nil
+}
+
+func detectParamTypeV3(paramType, refType string) (string, string) {
+	objectType := OBJECT
+	if strings.HasPrefix(refType, "[]") {
+		return ARRAY, TransToValidSchemeType(strings.TrimPrefix(refType, "[]"))
+	}
+	if IsPrimitiveType(refType) || (paramType == "formData" && refType == "file") {
+		objectType = PRIMITIVE
+	}
+	return objectType, refType
+}
+
+func validateSimpleParamTypeV3(paramType, objectType, refType string) error {
+	switch objectType {
+	case ARRAY:
+		if !IsPrimitiveType(refType) {
+			return fmt.Errorf("%s is not supported array type for %s", refType, paramType)
+		}
+	case OBJECT:
+		return fmt.Errorf("%s is not supported type for %s", refType, paramType)
+	}
+	return nil
+}
+
+func (o *OperationV3) expandQueryObjectParamsV3(refType, paramType string, enums []interface{}, astFile *ast.File) error {
+	schema, err := o.parser.getTypeSchemaV3(refType, astFile, false)
+	if err != nil {
+		return err
+	}
+
+	if len(schema.Spec.Properties) == 0 {
+		return nil
+	}
+
+	for name, item := range schema.Spec.Properties {
+		prop := item.Spec
+		if prop.Type == nil || len(*prop.Type) == 0 {
+			continue
+		}
+
+		itemParam, ok := o.buildQueryPropertyParamV3(name, refType, schema, prop, enums, paramType)
+		if !ok {
+			continue
+		}
+
+		listItem := spec.NewRefOrSpec(nil, &spec.Extendable[spec.Parameter]{Spec: &itemParam})
+		applyExplicitSerializationFlagsToParameter(listItem.Spec)
+		o.Operation.Parameters = append(o.Operation.Parameters, listItem)
+	}
+
+	return nil
+}
+
+func (o *OperationV3) buildQueryPropertyParamV3(name, refType string, schema *spec.RefOrSpec[spec.Schema], prop *spec.Schema, enums []interface{}, paramType string) (spec.Parameter, bool) {
+	switch {
+	case (*prop.Type)[0] == ARRAY &&
+		prop.Items.Schema != nil &&
+		prop.Items.Schema.Spec.Type != nil &&
+		len(*prop.Items.Schema.Spec.Type) > 0 &&
+		IsSimplePrimitiveType((*prop.Items.Schema.Spec.Type)[0]):
+		itemParam := createParameterV3(paramType, prop.Description, name, (*prop.Type)[0], (*prop.Items.Schema.Spec.Type)[0], findInSlice(schema.Spec.Required, name), enums, o.parser.collectionFormatInQuery)
+		itemParam.Schema.Spec = prop
+		return itemParam, true
+	case IsSimplePrimitiveType((*prop.Type)[0]):
+		itemParam := createParameterV3(paramType, prop.Description, name, PRIMITIVE, (*prop.Type)[0], findInSlice(schema.Spec.Required, name), enums, o.parser.collectionFormatInQuery)
+		itemParam.Schema.Spec = prop
+		return itemParam, true
+	default:
+		o.parser.debug.Printf("skip field [%s] in %s is not supported type for %s", name, refType, paramType)
+		return spec.Parameter{}, false
+	}
+}
+
+func (o *OperationV3) handleRequestBodyParamV3(commentLine, name, paramType, objectType, refType string, required bool, description string, astFile *ast.File) error {
+	schema, primitive, err := o.requestBodySchemaV3(commentLine, objectType, refType, astFile)
+	if err != nil {
+		return err
+	}
+
+	o.fillRequestBody(name, schema, required, description, primitive, paramType == "formData", formDataEncodingFromComment(commentLine, objectType))
+	return nil
+}
+
+func (o *OperationV3) requestBodySchemaV3(commentLine, objectType, refType string, astFile *ast.File) (*spec.RefOrSpec[spec.Schema], bool, error) {
+	if objectType == PRIMITIVE {
+		schema := PrimitiveSchemaV3(refType)
+		if err := o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec); err != nil {
+			return nil, false, err
+		}
+		return schema, true, nil
+	}
+
+	schema, err := o.parseAPIObjectSchema(commentLine, objectType, refType, astFile)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec); err != nil {
+		return nil, false, err
+	}
+
+	return schema, false, nil
 }
 
 func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.Schema], required bool, description string, primitive, formData bool, encoding *spec.Extendable[spec.Encoding]) {
@@ -543,27 +565,27 @@ func prepareRequestBodySchema(schema *spec.RefOrSpec[spec.Schema], name, descrip
 func requestBodyContentTypes(requestBody *spec.RefOrSpec[spec.Extendable[spec.RequestBody]], schema *spec.RefOrSpec[spec.Schema], primitive, formData bool) []string {
 	if !formData {
 		if primitive {
-			return []string{"text/plain"}
+			return []string{mediaTypeTextPlain}
 		}
-		return []string{"application/json"}
+		return []string{mediaTypeJSON}
 	}
 
 	contentTypes := make([]string, 0, 2)
 	if requestBody != nil && requestBody.Spec != nil && requestBody.Spec.Spec != nil {
-		if _, ok := requestBody.Spec.Spec.Content["multipart/form-data"]; ok {
-			contentTypes = append(contentTypes, "multipart/form-data")
+		if _, ok := requestBody.Spec.Spec.Content[mediaTypeMultipartForm]; ok {
+			contentTypes = append(contentTypes, mediaTypeMultipartForm)
 		}
-		if _, ok := requestBody.Spec.Spec.Content["application/x-www-form-urlencoded"]; ok {
-			contentTypes = append(contentTypes, "application/x-www-form-urlencoded")
+		if _, ok := requestBody.Spec.Spec.Content[mediaTypeFormURLEncoded]; ok {
+			contentTypes = append(contentTypes, mediaTypeFormURLEncoded)
 		}
 	}
 	if len(contentTypes) > 0 {
 		return contentTypes
 	}
 	if isBinaryFormDataSchema(schema) {
-		return []string{"multipart/form-data"}
+		return []string{mediaTypeMultipartForm}
 	}
-	return []string{"application/x-www-form-urlencoded"}
+	return []string{mediaTypeFormURLEncoded}
 }
 
 func ensureRequestBodyMediaType(requestBody *spec.RefOrSpec[spec.Extendable[spec.RequestBody]], contentType string) *spec.Extendable[spec.MediaType] {
@@ -1311,7 +1333,7 @@ func (o *OperationV3) ParseResponseComment(commentLine string, astFile *ast.File
 			}
 		} else {
 			// Default to application/json if no MIME types were specified
-			setResponseSchema(response.Spec.Spec, "application/json", schema)
+			setResponseSchema(response.Spec.Spec, mediaTypeJSON, schema)
 		}
 
 		o.AddResponse(codeStr, response)
