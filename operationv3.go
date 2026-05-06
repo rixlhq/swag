@@ -440,7 +440,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 				return err
 			}
 
-			o.fillRequestBody(name, schema, required, description, true, paramType == "formData")
+			o.fillRequestBody(name, schema, required, description, true, paramType == "formData", formDataEncodingFromComment(commentLine, objectType))
 
 			return nil
 
@@ -455,7 +455,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 		if err != nil {
 			return err
 		}
-		o.fillRequestBody(name, schema, required, description, false, paramType == "formData")
+		o.fillRequestBody(name, schema, required, description, false, paramType == "formData", formDataEncodingFromComment(commentLine, objectType))
 
 		return nil
 
@@ -477,7 +477,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	return nil
 }
 
-func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.Schema], required bool, description string, primitive, formData bool) {
+func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.Schema], required bool, description string, primitive, formData bool, encoding *spec.Extendable[spec.Encoding]) {
 	o.ensureRequestBody()
 	o.RequestBody.Spec.Spec.Required = o.RequestBody.Spec.Spec.Required || required
 	o.appendRequestBodyDescription(description)
@@ -487,7 +487,7 @@ func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.S
 	for _, contentType := range requestBodyContentTypes(o.RequestBody, schema, primitive, formData) {
 		mediaType := ensureRequestBodyMediaType(o.RequestBody, contentType)
 		if formData {
-			addRequestBodyProperty(mediaType, name, schema, required)
+			addRequestBodyProperty(mediaType, name, schema, required, encoding)
 			continue
 		}
 
@@ -574,11 +574,17 @@ func ensureRequestBodyMediaType(requestBody *spec.RefOrSpec[spec.Extendable[spec
 	return mediaType
 }
 
-func addRequestBodyProperty(mediaType *spec.Extendable[spec.MediaType], name string, schema *spec.RefOrSpec[spec.Schema], required bool) {
+func addRequestBodyProperty(mediaType *spec.Extendable[spec.MediaType], name string, schema *spec.RefOrSpec[spec.Schema], required bool, encoding *spec.Extendable[spec.Encoding]) {
 	rootSchema := ensureObjectRequestBodySchema(mediaType)
 	rootSchema.Spec.Properties[name] = schema
 	if required && !findInSlice(rootSchema.Spec.Required, name) {
 		rootSchema.Spec.Required = append(rootSchema.Spec.Required, name)
+	}
+	if encoding != nil {
+		if mediaType.Spec.Encoding == nil {
+			mediaType.Spec.Encoding = make(map[string]*spec.Extendable[spec.Encoding])
+		}
+		mediaType.Spec.Encoding[name] = encoding
 	}
 }
 
@@ -632,6 +638,43 @@ func isFileSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
 		schema.Spec.Type != nil &&
 		len(*schema.Spec.Type) == 1 &&
 		(*schema.Spec.Type)[0] == "file"
+}
+
+func formDataEncodingFromComment(commentLine, objectType string) *spec.Extendable[spec.Encoding] {
+	if objectType != ARRAY {
+		return nil
+	}
+
+	collectionFormat, err := findAttr(regexAttributes[collectionFormatTag], commentLine)
+	if err != nil || collectionFormat == "" {
+		return nil
+	}
+
+	style, explode := collectionFormatToEncodingV3(collectionFormat)
+	if style == "" {
+		return nil
+	}
+
+	encoding := spec.NewEncoding()
+	encoding.Spec.Style = style
+	encoding.Spec.Explode = explode
+
+	return encoding
+}
+
+func collectionFormatToEncodingV3(format string) (style string, explode bool) {
+	switch format {
+	case "multi":
+		return "form", true
+	case "csv":
+		return "form", false
+	case "ssv":
+		return "spaceDelimited", false
+	case "pipes":
+		return "pipeDelimited", false
+	default:
+		return "", false
+	}
 }
 
 func isDefaultAcceptSchema(schema *spec.RefOrSpec[spec.Schema]) bool {

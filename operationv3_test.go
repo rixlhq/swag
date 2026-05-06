@@ -1312,6 +1312,46 @@ func TestParseParamCommentByMultipartFormDataParamsV3(t *testing.T) {
 	assert.Nil(t, schema.OneOf)
 }
 
+func TestParseParamCommentByFormDataArrayEncodingV3(t *testing.T) {
+	t.Parallel()
+
+	operation := NewOperationV3(New())
+
+	err := operation.ParseComment(`@Param tags formData []string true "tags" collectionFormat(csv)`, nil)
+	require.NoError(t, err)
+
+	requestBody := operation.RequestBody
+	require.NotNil(t, requestBody)
+	mediaType := requestBody.Spec.Spec.Content["application/x-www-form-urlencoded"].Spec
+	require.NotNil(t, mediaType.Schema)
+	schema := mediaType.Schema.Spec
+	assert.Equal(t, &typeObject, schema.Type)
+	require.Contains(t, schema.Properties, "tags")
+	assert.Equal(t, &typeArray, schema.Properties["tags"].Spec.Type)
+	require.Contains(t, mediaType.Encoding, "tags")
+	assert.Equal(t, "form", mediaType.Encoding["tags"].Spec.Style)
+	assert.False(t, mediaType.Encoding["tags"].Spec.Explode)
+}
+
+func TestParseParamCommentByMultipartFormDataArrayEncodingV3(t *testing.T) {
+	t.Parallel()
+
+	operation := NewOperationV3(New())
+
+	err := operation.ParseComment(`@Accept multipart/form-data`, nil)
+	require.NoError(t, err)
+	err = operation.ParseComment(`@Param tags formData []string true "tags" collectionFormat(multi)`, nil)
+	require.NoError(t, err)
+
+	requestBody := operation.RequestBody
+	require.NotNil(t, requestBody)
+	mediaType := requestBody.Spec.Spec.Content["multipart/form-data"].Spec
+	require.NotNil(t, mediaType.Schema)
+	require.Contains(t, mediaType.Encoding, "tags")
+	assert.Equal(t, "form", mediaType.Encoding["tags"].Spec.Style)
+	assert.True(t, mediaType.Encoding["tags"].Spec.Explode)
+}
+
 func TestParseParamCommentByNotSupportedTypeV3(t *testing.T) {
 	t.Parallel()
 
