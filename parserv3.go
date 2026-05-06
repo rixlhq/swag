@@ -595,7 +595,7 @@ func processRouterOperationV3(p *Parser, o *OperationV3) error {
 		op := refRouteMethodOpV3(pathItem.Spec.Spec, routeProperties.HTTPMethod)
 
 		// check if we already have an operation for this path and method
-		if *op != nil {
+		if op.Spec != nil {
 			err := fmt.Errorf("route %s %s is declared multiple times", routeProperties.HTTPMethod, routeProperties.Path)
 			if p.Strict {
 				return err
@@ -604,7 +604,8 @@ func processRouterOperationV3(p *Parser, o *OperationV3) error {
 			p.debug.Printf("warning: %s\n", err)
 		}
 
-		*op = &o.Operation
+		op.Spec = &o.Operation
+		op.Extensions = o.Extensions
 
 		p.openAPI.Paths.Spec.Paths[routeProperties.Path] = pathItem
 	}
@@ -612,43 +613,43 @@ func processRouterOperationV3(p *Parser, o *OperationV3) error {
 	return nil
 }
 
-func refRouteMethodOpV3(item *spec.PathItem, method string) **spec.Operation {
+func refRouteMethodOpV3(item *spec.PathItem, method string) *spec.Extendable[spec.Operation] {
 	switch method {
 	case http.MethodGet:
 		if item.Get == nil {
 			item.Get = &spec.Extendable[spec.Operation]{}
 		}
-		return &item.Get.Spec
+		return item.Get
 	case http.MethodPost:
 		if item.Post == nil {
 			item.Post = &spec.Extendable[spec.Operation]{}
 		}
-		return &item.Post.Spec
+		return item.Post
 	case http.MethodDelete:
 		if item.Delete == nil {
 			item.Delete = &spec.Extendable[spec.Operation]{}
 		}
-		return &item.Delete.Spec
+		return item.Delete
 	case http.MethodPut:
 		if item.Put == nil {
 			item.Put = &spec.Extendable[spec.Operation]{}
 		}
-		return &item.Put.Spec
+		return item.Put
 	case http.MethodPatch:
 		if item.Patch == nil {
 			item.Patch = &spec.Extendable[spec.Operation]{}
 		}
-		return &item.Patch.Spec
+		return item.Patch
 	case http.MethodHead:
 		if item.Head == nil {
 			item.Head = &spec.Extendable[spec.Operation]{}
 		}
-		return &item.Head.Spec
+		return item.Head
 	case http.MethodOptions:
 		if item.Options == nil {
 			item.Options = &spec.Extendable[spec.Operation]{}
 		}
-		return &item.Options.Spec
+		return item.Options
 	default:
 		return nil
 	}

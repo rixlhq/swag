@@ -2024,7 +2024,7 @@ func TestParseExtensionsV3(t *testing.T) {
 			"passthroughBehavior": "when_no_match",
 			"type":                "aws_proxy",
 			"uri":                 "${some_arn}",
-		}, operation.Responses.Extensions["x-amazon-apigateway-integration"])
+		}, operation.Extensions["x-amazon-apigateway-integration"])
 	}
 
 	// Test x-tagGroups
@@ -2042,7 +2042,7 @@ func TestParseExtensionsV3(t *testing.T) {
 					"PersonRisk",
 					"PersonDocuments",
 				},
-			}}, operation.Responses.Extensions["x-tagGroups"])
+			}}, operation.Extensions["x-tagGroups"])
 	}
 }
 
@@ -2070,7 +2070,7 @@ func TestParseCodeSamplesV3(t *testing.T) {
 
 		assert.Equal(t, "example", operation.Summary)
 		assert.Equal(t, CodeSamples(CodeSamples{map[string]string{"lang": "JavaScript", "source": "console.log('Hello World');"}}),
-			operation.Responses.Extensions["x-codeSamples"],
+			operation.Extensions["x-codeSamples"],
 		)
 	})
 
