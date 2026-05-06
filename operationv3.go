@@ -471,6 +471,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	item := spec.NewRefOrSpec(nil, &spec.Extendable[spec.Parameter]{
 		Spec: &param,
 	})
+	applyExplicitSerializationFlagsToParameter(item.Spec)
 
 	o.Operation.Parameters = append(o.Operation.Parameters, item)
 
@@ -581,6 +582,7 @@ func addRequestBodyProperty(mediaType *spec.Extendable[spec.MediaType], name str
 		rootSchema.Spec.Required = append(rootSchema.Spec.Required, name)
 	}
 	if encoding != nil {
+		applyExplicitSerializationFlagsToEncoding(encoding)
 		if mediaType.Spec.Encoding == nil {
 			mediaType.Spec.Encoding = make(map[string]*spec.Extendable[spec.Encoding])
 		}
@@ -641,17 +643,8 @@ func isFileSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
 }
 
 func formDataEncodingFromComment(commentLine, objectType string) *spec.Extendable[spec.Encoding] {
-	if objectType != ARRAY {
-		return nil
-	}
-
-	collectionFormat, err := findAttr(regexAttributes[collectionFormatTag], commentLine)
-	if err != nil || collectionFormat == "" {
-		return nil
-	}
-
-	style, explode := collectionFormatToEncodingV3(collectionFormat)
-	if style == "" {
+	style, explode, ok := serializationFromCommentV3(commentLine, objectType, "form")
+	if !ok {
 		return nil
 	}
 
@@ -660,6 +653,36 @@ func formDataEncodingFromComment(commentLine, objectType string) *spec.Extendabl
 	encoding.Spec.Explode = explode
 
 	return encoding
+}
+
+func serializationFromCommentV3(commentLine, objectType, location string) (style string, explode bool, ok bool) {
+	if objectType != ARRAY {
+		return "", false, false
+	}
+
+	style, hasStyle := parseStyleAttribute(commentLine, location)
+	explode, hasExplode := parseExplodeAttribute(commentLine)
+	if hasStyle {
+		if !hasExplode {
+			explode = defaultExplodeForStyle(style)
+		}
+		return style, explode, true
+	}
+	if hasExplode {
+		return "form", explode, true
+	}
+
+	collectionFormat, err := findAttr(regexAttributes[collectionFormatTag], commentLine)
+	if err != nil || collectionFormat == "" {
+		return "", false, false
+	}
+
+	style, explode = collectionFormatToEncodingV3(collectionFormat)
+	if style == "" {
+		return "", false, false
+	}
+
+	return style, explode, true
 }
 
 func collectionFormatToEncodingV3(format string) (style string, explode bool) {
@@ -675,6 +698,42 @@ func collectionFormatToEncodingV3(format string) (style string, explode bool) {
 	default:
 		return "", false
 	}
+}
+
+func parseStyleAttribute(commentLine, in string) (string, bool) {
+	attr, err := findAttr(regexAttributes[styleTag], commentLine)
+	if err != nil || attr == "" {
+		return "", false
+	}
+
+	style := TransToValidCollectionFormatV3(attr, in)
+	if style == "" {
+		return "", false
+	}
+
+	return style, true
+}
+
+func parseExplodeAttribute(commentLine string) (bool, bool) {
+	attr, err := findAttr(regexAttributes[explodeTag], commentLine)
+	if err != nil || attr == "" {
+		return false, false
+	}
+
+	return strings.EqualFold(attr, "true"), true
+}
+
+func parseAllowReservedAttribute(commentLine string) (bool, bool) {
+	attr, err := findAttr(regexAttributes[allowReservedTag], commentLine)
+	if err != nil || attr == "" {
+		return false, false
+	}
+
+	return strings.EqualFold(attr, "true"), true
+}
+
+func defaultExplodeForStyle(style string) bool {
+	return style == "form"
 }
 
 func isDefaultAcceptSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
@@ -737,6 +796,12 @@ func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string
 			param.Schema.Spec.Extensions = setExtensionParam(attr)
 		case collectionFormatTag:
 			err = setCollectionFormatParamV3(param, attrKey, objectType, attr, comment)
+		case styleTag:
+			err = setStyleParamV3(param, attrKey, objectType, attr, comment)
+		case explodeTag:
+			err = setExplodeParamV3(param, attrKey, objectType, attr, comment)
+		case allowReservedTag:
+			err = setAllowReservedParamV3(param, attrKey, attr)
 		}
 
 		if err != nil {
@@ -785,11 +850,54 @@ func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType
 
 func setCollectionFormatParamV3(param *spec.Parameter, name, schemaType, attr, commentLine string) error {
 	if schemaType == ARRAY {
-		param.Style = TransToValidCollectionFormatV3(attr, param.In)
+		style, explode := collectionFormatToEncodingV3(attr)
+		if param.In != "query" && param.In != "formData" {
+			param.Style = TransToValidCollectionFormatV3(attr, param.In)
+			return nil
+		}
+		if style == "" {
+			param.Style = TransToValidCollectionFormatV3(attr, param.In)
+			return nil
+		}
+		param.Style = style
+		param.Explode = explode
 		return nil
 	}
 
 	return fmt.Errorf("%s is attribute to set to an array. comment=%s got=%s", name, commentLine, schemaType)
+}
+
+func setStyleParamV3(param *spec.Parameter, name, schemaType, attr, commentLine string) error {
+	if schemaType != ARRAY && schemaType != OBJECT && schemaType != PRIMITIVE {
+		return fmt.Errorf("%s is not valid for comment=%s got=%s", name, commentLine, schemaType)
+	}
+
+	style := TransToValidCollectionFormatV3(attr, param.In)
+	if style == "" {
+		return fmt.Errorf("%s is not supported for in=%s comment=%s got=%s", name, param.In, commentLine, attr)
+	}
+
+	param.Style = style
+
+	return nil
+}
+
+func setExplodeParamV3(param *spec.Parameter, name, schemaType, attr, commentLine string) error {
+	if schemaType != ARRAY && schemaType != OBJECT {
+		return fmt.Errorf("%s is attribute to set to an array or object. comment=%s got=%s", name, commentLine, schemaType)
+	}
+
+	param.Explode = strings.EqualFold(attr, "true")
+	return nil
+}
+
+func setAllowReservedParamV3(param *spec.Parameter, name, attr string) error {
+	if param.In != "query" {
+		return fmt.Errorf("%s is only valid for query parameters", name)
+	}
+
+	param.AllowReserved = strings.EqualFold(attr, "true")
+	return nil
 }
 
 func setSchemaExampleV3(param *spec.Schema, schemaType string, value string) error {
@@ -987,12 +1095,43 @@ func createParameterV3(in, description, paramName, objectType, schemaType string
 		result.Schema.Spec.Items = spec.NewBoolOrSchema(false, spec.NewSchemaSpec())
 		result.Schema.Spec.Items.Schema.Spec.Type = &spec.SingleOrArray[string]{schemaType}
 		result.Schema.Spec.Enum = enums
+		if in == "query" {
+			style, explode := collectionFormatToEncodingV3(collectionFormat)
+			result.Style = style
+			result.Explode = explode
+		}
 	case PRIMITIVE, OBJECT:
 		result.Schema.Spec.Type = &spec.SingleOrArray[string]{schemaType}
 		result.Schema.Spec.Enum = enums
 	}
 
 	return result
+}
+
+func applyExplicitSerializationFlagsToParameter(param *spec.Extendable[spec.Parameter]) {
+	if param == nil || param.Spec == nil {
+		return
+	}
+
+	if param.Spec.Style == "form" && !param.Spec.Explode {
+		if param.Extensions == nil {
+			param.Extensions = make(map[string]any)
+		}
+		param.Extensions["explode"] = false
+	}
+}
+
+func applyExplicitSerializationFlagsToEncoding(encoding *spec.Extendable[spec.Encoding]) {
+	if encoding == nil || encoding.Spec == nil {
+		return
+	}
+
+	if encoding.Spec.Style == "form" && !encoding.Spec.Explode {
+		if encoding.Extensions == nil {
+			encoding.Extensions = make(map[string]any)
+		}
+		encoding.Extensions["explode"] = false
+	}
 }
 
 func (o *OperationV3) parseObjectSchema(refType string, astFile *ast.File) (*spec.RefOrSpec[spec.Schema], error) {

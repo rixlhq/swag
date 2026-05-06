@@ -1,6 +1,7 @@
 package swag
 
 import (
+	"encoding/json"
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
@@ -1026,7 +1027,39 @@ func TestParseParamCommentQueryArrayFormatV3(t *testing.T) {
 	assert.Equal(t, "query", parameterSpec.In)
 	assert.Equal(t, &typeString, parameterSpec.Schema.Spec.Items.Schema.Spec.Type)
 	assert.Equal(t, "form", parameterSpec.Style)
+	assert.True(t, parameterSpec.Explode)
 
+}
+
+func TestParseParamCommentQueryArrayDefaultFormatV3(t *testing.T) {
+	t.Parallel()
+
+	operation := NewOperationV3(New(SetCollectionFormat("multi")))
+	err := operation.ParseComment(`@Param names query []string true "Users List"`, nil)
+	require.NoError(t, err)
+
+	parameterSpec := operation.Operation.Parameters[0].Spec.Spec
+	assert.Equal(t, "form", parameterSpec.Style)
+	assert.True(t, parameterSpec.Explode)
+}
+
+func TestParseParamCommentQueryArrayStyleExplodeV3(t *testing.T) {
+	t.Parallel()
+
+	operation := NewOperationV3(New())
+	err := operation.ParseComment(`@Param names query []string true "Users List" style(form) explode(false) allowReserved(true)`, nil)
+	require.NoError(t, err)
+
+	item := operation.Operation.Parameters[0]
+	parameterSpec := item.Spec.Spec
+	assert.Equal(t, "form", parameterSpec.Style)
+	assert.False(t, parameterSpec.Explode)
+	assert.True(t, parameterSpec.AllowReserved)
+
+	raw, err := json.Marshal(item)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"explode":false`)
+	assert.Contains(t, string(raw), `"allowReserved":true`)
 }
 
 func TestParseParamCommentByIDV3(t *testing.T) {
@@ -1331,6 +1364,16 @@ func TestParseParamCommentByFormDataArrayEncodingV3(t *testing.T) {
 	require.Contains(t, mediaType.Encoding, "tags")
 	assert.Equal(t, "form", mediaType.Encoding["tags"].Spec.Style)
 	assert.False(t, mediaType.Encoding["tags"].Spec.Explode)
+
+	raw, err := json.Marshal(requestBody)
+	require.NoError(t, err)
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	content := decoded["content"].(map[string]any)
+	encoding := content["application/x-www-form-urlencoded"].(map[string]any)["encoding"].(map[string]any)
+	tags := encoding["tags"].(map[string]any)
+	assert.Equal(t, "form", tags["style"])
+	assert.Equal(t, false, tags["explode"])
 }
 
 func TestParseParamCommentByMultipartFormDataArrayEncodingV3(t *testing.T) {
