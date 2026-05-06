@@ -1233,7 +1233,13 @@ func TestParseParamCommentByFormDataTypeV3(t *testing.T) {
 
 	requestBodySpec := requestBody.Spec.Spec
 	assert.NotNil(t, requestBodySpec)
-	assert.Equal(t, &typeFile, requestBodySpec.Content["application/x-www-form-urlencoded"].Spec.Schema.Spec.Type)
+	schema := requestBodySpec.Content["multipart/form-data"].Spec.Schema.Spec
+	assert.Equal(t, &typeObject, schema.Type)
+	assert.NotNil(t, schema.Properties["file"])
+	assert.Equal(t, &typeString, schema.Properties["file"].Spec.Type)
+	assert.Equal(t, "binary", schema.Properties["file"].Spec.Format)
+	assert.Equal(t, []string{"file"}, schema.Required)
+	assert.Nil(t, schema.OneOf)
 }
 
 func TestParseParamCommentByFormDataTypeUint64V3(t *testing.T) {
@@ -1253,7 +1259,57 @@ func TestParseParamCommentByFormDataTypeUint64V3(t *testing.T) {
 
 	requestBodySpec := requestBody.Spec.Spec.Content["application/x-www-form-urlencoded"].Spec
 	assert.NotNil(t, requestBodySpec)
-	assert.Equal(t, &typeInteger, requestBodySpec.Schema.Spec.Type)
+	assert.Equal(t, &typeObject, requestBodySpec.Schema.Spec.Type)
+	assert.NotNil(t, requestBodySpec.Schema.Spec.Properties["file"])
+	assert.Equal(t, &typeInteger, requestBodySpec.Schema.Spec.Properties["file"].Spec.Type)
+	assert.Equal(t, []string{"file"}, requestBodySpec.Schema.Spec.Required)
+	assert.Nil(t, requestBodySpec.Schema.Spec.OneOf)
+}
+
+func TestParseParamCommentByMultipleFormDataParamsV3(t *testing.T) {
+	t.Parallel()
+
+	operation := NewOperationV3(New())
+
+	err := operation.ParseComment(`@Param name formData string true "user name"`, nil)
+	assert.NoError(t, err)
+	err = operation.ParseComment(`@Param age formData int false "user age"`, nil)
+	assert.NoError(t, err)
+
+	requestBody := operation.RequestBody
+	require.NotNil(t, requestBody)
+
+	schema := requestBody.Spec.Spec.Content["application/x-www-form-urlencoded"].Spec.Schema.Spec
+	assert.Equal(t, &typeObject, schema.Type)
+	assert.Len(t, schema.Properties, 2)
+	assert.Equal(t, &typeString, schema.Properties["name"].Spec.Type)
+	assert.Equal(t, &typeInteger, schema.Properties["age"].Spec.Type)
+	assert.Equal(t, []string{"name"}, schema.Required)
+	assert.Nil(t, schema.OneOf)
+}
+
+func TestParseParamCommentByMultipartFormDataParamsV3(t *testing.T) {
+	t.Parallel()
+
+	operation := NewOperationV3(New())
+
+	err := operation.ParseComment(`@Accept multipart/form-data`, nil)
+	require.NoError(t, err)
+	err = operation.ParseComment(`@Param file formData file true "avatar"`, nil)
+	assert.NoError(t, err)
+	err = operation.ParseComment(`@Param title formData string true "title"`, nil)
+	assert.NoError(t, err)
+
+	requestBody := operation.RequestBody
+	require.NotNil(t, requestBody)
+	schema := requestBody.Spec.Spec.Content["multipart/form-data"].Spec.Schema.Spec
+	assert.Equal(t, &typeObject, schema.Type)
+	assert.Len(t, schema.Properties, 2)
+	assert.Equal(t, &typeString, schema.Properties["file"].Spec.Type)
+	assert.Equal(t, "binary", schema.Properties["file"].Spec.Format)
+	assert.Equal(t, &typeString, schema.Properties["title"].Spec.Type)
+	assert.ElementsMatch(t, []string{"file", "title"}, schema.Required)
+	assert.Nil(t, schema.OneOf)
 }
 
 func TestParseParamCommentByNotSupportedTypeV3(t *testing.T) {

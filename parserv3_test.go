@@ -406,7 +406,20 @@ func TestParseSimpleApiV3(t *testing.T) {
 	path = paths["/FormData"].Spec.Spec.Post.Spec
 	assert.NotNil(t, path)
 	assert.NotNil(t, path.RequestBody)
-	//TODO add asserts
+	formSchema := path.RequestBody.Spec.Spec.Content["application/x-www-form-urlencoded"].Spec.Schema.Spec
+	assert.Equal(t, &typeObject, formSchema.Type)
+	require.Contains(t, formSchema.Properties, "Token")
+	assert.Equal(t, "#/components/schemas/web.Request", formSchema.Properties["Token"].Ref.Ref)
+	assert.Equal(t, []string{"Token"}, formSchema.Required)
+
+	uploadPath := paths["/file/upload"].Spec.Spec.Post.Spec
+	require.NotNil(t, uploadPath.RequestBody)
+	uploadSchema := uploadPath.RequestBody.Spec.Spec.Content["multipart/form-data"].Spec.Schema.Spec
+	assert.Equal(t, &typeObject, uploadSchema.Type)
+	require.Contains(t, uploadSchema.Properties, "file")
+	assert.Equal(t, &typeString, uploadSchema.Properties["file"].Spec.Type)
+	assert.Equal(t, "binary", uploadSchema.Properties["file"].Spec.Format)
+	assert.Equal(t, []string{"file"}, uploadSchema.Required)
 
 	t.Run("Test parse struct oneOf", func(t *testing.T) {
 		t.Parallel()

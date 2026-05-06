@@ -478,40 +478,55 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 }
 
 func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.Schema], required bool, description string, primitive, formData bool) {
-	if o.RequestBody == nil {
-		o.RequestBody = spec.NewRequestBodySpec()
-		o.RequestBody.Spec.Spec.Content = make(map[string]*spec.Extendable[spec.MediaType])
+	o.ensureRequestBody()
+	o.RequestBody.Spec.Spec.Required = o.RequestBody.Spec.Spec.Required || required
+	o.appendRequestBodyDescription(description)
 
-		if primitive && !formData {
-			o.RequestBody.Spec.Spec.Content["text/plain"] = spec.NewMediaType()
-		} else if formData {
-			o.RequestBody.Spec.Spec.Content["application/x-www-form-urlencoded"] = spec.NewMediaType()
+	schema = prepareRequestBodySchema(schema, name, description, formData)
+
+	for _, contentType := range requestBodyContentTypes(o.RequestBody, schema, primitive, formData) {
+		mediaType := ensureRequestBodyMediaType(o.RequestBody, contentType)
+		if formData {
+			addRequestBodyProperty(mediaType, name, schema, required)
+			continue
+		}
+
+		if mediaType.Spec.Schema == nil || isDefaultAcceptSchema(mediaType.Spec.Schema) {
+			mediaType.Spec.Schema = schema
+		} else if mediaType.Spec.Schema.Ref != nil || mediaType.Spec.Schema.Spec.OneOf == nil {
+			oneOfSchema := spec.NewSchemaSpec()
+			oneOfSchema.Spec.OneOf = []*spec.RefOrSpec[spec.Schema]{mediaType.Spec.Schema, schema}
+			mediaType.Spec.Schema = oneOfSchema
 		} else {
-			o.RequestBody.Spec.Spec.Content["application/json"] = spec.NewMediaType()
+			mediaType.Spec.Schema.Spec.OneOf = append(mediaType.Spec.Schema.Spec.OneOf, schema)
 		}
 	}
+}
 
-	o.RequestBody.Spec.Spec.Required = required
+func (o *OperationV3) ensureRequestBody() {
+	if o.RequestBody == nil {
+		o.RequestBody = spec.NewRequestBodySpec()
+	}
+	if o.RequestBody.Spec.Spec.Content == nil {
+		o.RequestBody.Spec.Spec.Content = make(map[string]*spec.Extendable[spec.MediaType])
+	}
+}
 
-	// Append description to existing description if this is not the first body
+func (o *OperationV3) appendRequestBodyDescription(description string) {
 	if o.RequestBody.Spec.Spec.Description != "" && description != "" {
 		o.RequestBody.Spec.Spec.Description += " | " + description
 	} else if description != "" {
 		o.RequestBody.Spec.Spec.Description = description
 	}
+}
 
-	// Handle oneOf merging for request body schemas
-	contentType := "application/json"
-	if primitive && !formData {
-		contentType = "text/plain"
-	} else if formData {
-		contentType = "application/x-www-form-urlencoded"
+func prepareRequestBodySchema(schema *spec.RefOrSpec[spec.Schema], name, description string, formData bool) *spec.RefOrSpec[spec.Schema] {
+	if formData {
+		return normalizeFormDataSchema(schema, description)
 	}
 
-	mediaType := o.RequestBody.Spec.Spec.Content[contentType]
-	if mediaType == nil {
-		mediaType = spec.NewMediaType()
-		o.RequestBody.Spec.Spec.Content[contentType] = mediaType
+	if schema == nil {
+		return nil
 	}
 	if schema.Ref != nil {
 		schema.Ref.Summary = name
@@ -520,17 +535,103 @@ func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.S
 	if schema.Spec != nil {
 		schema.Spec.Title = name
 	}
-	if mediaType.Spec.Schema == nil || isDefaultAcceptSchema(mediaType.Spec.Schema) {
-		mediaType.Spec.Schema = schema
-	} else if mediaType.Spec.Schema.Ref != nil || mediaType.Spec.Schema.Spec.OneOf == nil {
-		// If there's an existing schema that doesn't have oneOf, create a oneOf schema
-		oneOfSchema := spec.NewSchemaSpec()
-		oneOfSchema.Spec.OneOf = []*spec.RefOrSpec[spec.Schema]{mediaType.Spec.Schema, schema}
-		mediaType.Spec.Schema = oneOfSchema
-	} else {
-		// If there's already a oneOf schema, append to it
-		mediaType.Spec.Schema.Spec.OneOf = append(mediaType.Spec.Schema.Spec.OneOf, schema)
+
+	return schema
+}
+
+func requestBodyContentTypes(requestBody *spec.RefOrSpec[spec.Extendable[spec.RequestBody]], schema *spec.RefOrSpec[spec.Schema], primitive, formData bool) []string {
+	if !formData {
+		if primitive {
+			return []string{"text/plain"}
+		}
+		return []string{"application/json"}
 	}
+
+	contentTypes := make([]string, 0, 2)
+	if requestBody != nil && requestBody.Spec != nil && requestBody.Spec.Spec != nil {
+		if _, ok := requestBody.Spec.Spec.Content["multipart/form-data"]; ok {
+			contentTypes = append(contentTypes, "multipart/form-data")
+		}
+		if _, ok := requestBody.Spec.Spec.Content["application/x-www-form-urlencoded"]; ok {
+			contentTypes = append(contentTypes, "application/x-www-form-urlencoded")
+		}
+	}
+	if len(contentTypes) > 0 {
+		return contentTypes
+	}
+	if isBinaryFormDataSchema(schema) {
+		return []string{"multipart/form-data"}
+	}
+	return []string{"application/x-www-form-urlencoded"}
+}
+
+func ensureRequestBodyMediaType(requestBody *spec.RefOrSpec[spec.Extendable[spec.RequestBody]], contentType string) *spec.Extendable[spec.MediaType] {
+	mediaType := requestBody.Spec.Spec.Content[contentType]
+	if mediaType == nil {
+		mediaType = spec.NewMediaType()
+		requestBody.Spec.Spec.Content[contentType] = mediaType
+	}
+	return mediaType
+}
+
+func addRequestBodyProperty(mediaType *spec.Extendable[spec.MediaType], name string, schema *spec.RefOrSpec[spec.Schema], required bool) {
+	rootSchema := ensureObjectRequestBodySchema(mediaType)
+	rootSchema.Spec.Properties[name] = schema
+	if required && !findInSlice(rootSchema.Spec.Required, name) {
+		rootSchema.Spec.Required = append(rootSchema.Spec.Required, name)
+	}
+}
+
+func ensureObjectRequestBodySchema(mediaType *spec.Extendable[spec.MediaType]) *spec.RefOrSpec[spec.Schema] {
+	rootSchema := mediaType.Spec.Schema
+	if rootSchema == nil || isDefaultAcceptSchema(rootSchema) || rootSchema.Ref != nil || rootSchema.Spec == nil {
+		rootSchema = spec.NewSchemaSpec()
+		mediaType.Spec.Schema = rootSchema
+	}
+	if rootSchema.Spec.Type == nil {
+		rootSchema.Spec.Type = &spec.SingleOrArray[string]{OBJECT}
+	}
+	if rootSchema.Spec.Properties == nil {
+		rootSchema.Spec.Properties = make(map[string]*spec.RefOrSpec[spec.Schema])
+	}
+	return rootSchema
+}
+
+func normalizeFormDataSchema(schema *spec.RefOrSpec[spec.Schema], description string) *spec.RefOrSpec[spec.Schema] {
+	if isFileSchema(schema) {
+		fileSchema := spec.NewSchemaSpec()
+		fileSchema.Spec.Type = &spec.SingleOrArray[string]{STRING}
+		fileSchema.Spec.Format = "binary"
+		fileSchema.Spec.Description = description
+		return fileSchema
+	}
+
+	if schema == nil {
+		return nil
+	}
+	if schema.Ref != nil {
+		return schema
+	}
+
+	cloned := spec.NewSchemaSpec()
+	*cloned.Spec = *schema.Spec
+	if description != "" && cloned.Spec.Description == "" {
+		cloned.Spec.Description = description
+	}
+	return cloned
+}
+
+func isBinaryFormDataSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
+	return isFileSchema(schema) || (schema != nil && schema.Spec != nil && schema.Spec.Format == "binary")
+}
+
+func isFileSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
+	return schema != nil &&
+		schema.Ref == nil &&
+		schema.Spec != nil &&
+		schema.Spec.Type != nil &&
+		len(*schema.Spec.Type) == 1 &&
+		(*schema.Spec.Type)[0] == "file"
 }
 
 func isDefaultAcceptSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
