@@ -277,13 +277,12 @@ func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.F
 		objectType = ARRAY
 		refType = strings.TrimPrefix(refType, "[]")
 		refType, format = TransToValidSchemeTypeWithFormat(refType)
-	} else if IsPrimitiveType(refType) ||
-		paramType == "formData" && refType == "file" {
+	} else if IsPrimitiveType(refType) || isFormDataFileRefType(paramType, refType) {
 		objectType = PRIMITIVE
 	}
 
 	var enums []any
-	if !IsPrimitiveType(refType) {
+	if !IsPrimitiveType(refType) && !isFormDataFileRefType(paramType, refType) {
 		schema, _ := operation.parser.getTypeSchema(refType, astFile, false)
 		if schema != nil && len(schema.Type) == 1 && schema.Enum != nil {
 			if objectType == OBJECT {

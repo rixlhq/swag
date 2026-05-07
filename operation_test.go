@@ -1708,6 +1708,25 @@ func TestParseParamCommentByFormDataType(t *testing.T) {
 	assert.Equal(t, expected, string(b))
 }
 
+func TestParseParamCommentByFormDataArrayFileType(t *testing.T) {
+	t.Parallel()
+
+	comment := `@Param files formData []file true "Audio files" collectionFormat(multi)`
+	operation := NewOperation(New())
+
+	err := operation.ParseComment(comment, nil)
+	assert.NoError(t, err)
+
+	assert.Len(t, operation.Parameters, 1)
+	parameterSpec := operation.Parameters[0]
+	assert.Equal(t, "files", parameterSpec.Name)
+	assert.Equal(t, "formData", parameterSpec.In)
+	assert.Equal(t, ARRAY, parameterSpec.Type)
+	require.NotNil(t, parameterSpec.Items)
+	assert.Equal(t, "file", parameterSpec.Items.Type)
+	assert.Equal(t, "multi", parameterSpec.CollectionFormat)
+}
+
 func TestParseParamCommentByFormDataTypeUint64(t *testing.T) {
 	t.Parallel()
 

@@ -1275,6 +1275,30 @@ func TestParseParamCommentByFormDataTypeV3(t *testing.T) {
 	assert.Nil(t, schema.OneOf)
 }
 
+func TestParseParamCommentByFormDataArrayFileTypeV3(t *testing.T) {
+	t.Parallel()
+
+	comment := `@Param files formData []file true "Audio files" collectionFormat(multi)`
+	operation := NewOperationV3(New())
+
+	err := operation.ParseComment(comment, nil)
+	assert.NoError(t, err)
+
+	requestBody := operation.RequestBody
+	require.NotNil(t, requestBody)
+
+	requestBodySpec := requestBody.Spec.Spec
+	schema := requestBodySpec.Content["multipart/form-data"].Spec.Schema.Spec
+	assert.Equal(t, &typeObject, schema.Type)
+	require.NotNil(t, schema.Properties["files"])
+	assert.Equal(t, &typeArray, schema.Properties["files"].Spec.Type)
+	require.NotNil(t, schema.Properties["files"].Spec.Items)
+	require.NotNil(t, schema.Properties["files"].Spec.Items.Schema)
+	assert.Equal(t, &typeString, schema.Properties["files"].Spec.Items.Schema.Spec.Type)
+	assert.Equal(t, "binary", schema.Properties["files"].Spec.Items.Schema.Spec.Format)
+	assert.Equal(t, []string{"files"}, schema.Required)
+}
+
 func TestParseParamCommentByFormDataTypeUint64V3(t *testing.T) {
 	t.Parallel()
 

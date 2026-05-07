@@ -350,7 +350,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	objectType, refType := detectParamTypeV3(paramType, refType)
 
 	var enums []interface{}
-	if !IsPrimitiveType(refType) {
+	if !IsPrimitiveType(refType) && !isFormDataFileRefType(paramType, refType) {
 		schema, _ := o.parser.getTypeSchemaV3(refType, astFile, false)
 		if schema != nil && schema.Spec != nil && schema.Spec.Enum != nil {
 			if objectType == OBJECT {
@@ -405,10 +405,14 @@ func detectParamTypeV3(paramType, refType string) (string, string) {
 	if strings.HasPrefix(refType, "[]") {
 		return ARRAY, TransToValidSchemeType(strings.TrimPrefix(refType, "[]"))
 	}
-	if IsPrimitiveType(refType) || (paramType == "formData" && refType == "file") {
+	if IsPrimitiveType(refType) || isFormDataFileRefType(paramType, refType) {
 		objectType = PRIMITIVE
 	}
 	return objectType, refType
+}
+
+func isFormDataFileRefType(paramType, refType string) bool {
+	return paramType == "formData" && refType == "file"
 }
 
 func validateSimpleParamTypeV3(paramType, objectType, refType string) error {
@@ -637,6 +641,15 @@ func normalizeFormDataSchema(schema *spec.RefOrSpec[spec.Schema], description st
 		fileSchema.Spec.Description = description
 		return fileSchema
 	}
+	if isFileArraySchema(schema) {
+		arraySchema := spec.NewSchemaSpec()
+		arraySchema.Spec.Type = &spec.SingleOrArray[string]{ARRAY}
+		arraySchema.Spec.Description = description
+		arraySchema.Spec.Items = spec.NewBoolOrSchema(false, spec.NewSchemaSpec())
+		arraySchema.Spec.Items.Schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
+		arraySchema.Spec.Items.Schema.Spec.Format = "binary"
+		return arraySchema
+	}
 
 	if schema == nil {
 		return nil
@@ -654,7 +667,7 @@ func normalizeFormDataSchema(schema *spec.RefOrSpec[spec.Schema], description st
 }
 
 func isBinaryFormDataSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
-	return isFileSchema(schema) || (schema != nil && schema.Spec != nil && schema.Spec.Format == "binary")
+	return isFileSchema(schema) || isFileArraySchema(schema) || isBinaryArraySchema(schema) || (schema != nil && schema.Spec != nil && schema.Spec.Format == "binary")
 }
 
 func isFileSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
@@ -664,6 +677,34 @@ func isFileSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
 		schema.Spec.Type != nil &&
 		len(*schema.Spec.Type) == 1 &&
 		(*schema.Spec.Type)[0] == "file"
+}
+
+func isFileArraySchema(schema *spec.RefOrSpec[spec.Schema]) bool {
+	return schema != nil &&
+		schema.Ref == nil &&
+		schema.Spec != nil &&
+		schema.Spec.Type != nil &&
+		len(*schema.Spec.Type) == 1 &&
+		(*schema.Spec.Type)[0] == ARRAY &&
+		schema.Spec.Items != nil &&
+		schema.Spec.Items.Schema != nil &&
+		isFileSchema(schema.Spec.Items.Schema)
+}
+
+func isBinaryArraySchema(schema *spec.RefOrSpec[spec.Schema]) bool {
+	return schema != nil &&
+		schema.Ref == nil &&
+		schema.Spec != nil &&
+		schema.Spec.Type != nil &&
+		len(*schema.Spec.Type) == 1 &&
+		(*schema.Spec.Type)[0] == ARRAY &&
+		schema.Spec.Items != nil &&
+		schema.Spec.Items.Schema != nil &&
+		schema.Spec.Items.Schema.Spec != nil &&
+		schema.Spec.Items.Schema.Spec.Type != nil &&
+		len(*schema.Spec.Items.Schema.Spec.Type) == 1 &&
+		(*schema.Spec.Items.Schema.Spec.Type)[0] == STRING &&
+		schema.Spec.Items.Schema.Spec.Format == "binary"
 }
 
 func formDataEncodingFromComment(commentLine, objectType string) *spec.Extendable[spec.Encoding] {
@@ -1143,6 +1184,8 @@ func parseObjectSchemaV3(parser *Parser, refType string, astFile *ast.File) (*sp
 		return PrimitiveSchemaV3(OBJECT), nil
 	case refType == ANY:
 		return PrimitiveSchemaV3(OBJECT), nil
+	case refType == "file":
+		return PrimitiveSchemaV3(refType), nil
 	case IsGolangPrimitiveType(refType):
 		refType = TransToValidSchemeType(refType)
 
