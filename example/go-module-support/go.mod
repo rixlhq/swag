@@ -2,6 +2,8 @@ module github.com/swaggo/swag/example/go-module-support
 
 go 1.25.0
 
+toolchain go1.27.3
+
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/swaggo/examples v0.0.0-20190624100559-f57286ab550c

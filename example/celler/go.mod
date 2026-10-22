@@ -2,6 +2,8 @@ module github.com/swaggo/swag/example/celler
 
 go 1.25.0
 
+toolchain go1.27.3
+
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/gofrs/uuid v4.2.0+incompatible

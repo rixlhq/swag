@@ -2,6 +2,8 @@ module github.com/swaggo/swag/example/markdown
 
 go 1.25.0
 
+toolchain go1.27.3
+
 require (
 	github.com/gorilla/mux v1.8.0
 	github.com/swaggo/http-swagger v1.2.6
