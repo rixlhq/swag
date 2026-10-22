@@ -2,6 +2,8 @@ module github.com/swaggo/swag/v2
 
 go 1.25.0
 
+toolchain go1.27.3
+
 require (
 	github.com/KyleBanks/depth v1.2.1
 	github.com/go-openapi/spec v0.22.1
