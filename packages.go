@@ -3,18 +3,17 @@ package swag
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/constant"
 	goparser "go/parser"
 	"go/token"
 	"go/types"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
 
-	"golang.org/x/tools/go/loader"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -116,7 +115,7 @@ func (pkgDefs *PackagesDefinitions) RangeFiles(handle func(info *AstFileInfo) er
 	for _, info := range pkgDefs.files {
 		// ignore package path prefix with 'vendor' or $GOROOT,
 		// because the router info of api will not be included these files.
-		if strings.HasPrefix(info.PackagePath, "vendor") || (runtime.GOROOT() != "" && strings.HasPrefix(info.Path, runtime.GOROOT()+string(filepath.Separator))) {
+		if strings.HasPrefix(info.PackagePath, "vendor") || (build.Default.GOROOT != "" && strings.HasPrefix(info.Path, build.Default.GOROOT+string(filepath.Separator))) {
 			continue
 		}
 		sortedFiles = append(sortedFiles, info)
@@ -156,7 +155,8 @@ func (pkgDefs *PackagesDefinitions) parseTypesFromFile(astFile *ast.File, packag
 		if !ok {
 			continue
 		}
-		if generalDeclaration.Tok == token.TYPE {
+		switch generalDeclaration.Tok {
+		case token.TYPE:
 			for _, astSpec := range generalDeclaration.Specs {
 				if typeSpec, ok := astSpec.(*ast.TypeSpec); ok {
 					typeSpecDef := &TypeSpecDef{
@@ -208,7 +208,7 @@ func (pkgDefs *PackagesDefinitions) parseTypesFromFile(astFile *ast.File, packag
 					}
 				}
 			}
-		} else if generalDeclaration.Tok == token.CONST {
+		case token.CONST:
 			// collect consts
 			pkgDefs.collectConstVariables(astFile, packagePath, generalDeclaration)
 		}
@@ -561,24 +561,22 @@ func (pkgDefs *PackagesDefinitions) loadExternalPackage(importPath string) error
 		return err
 	}
 
-	conf := loader.Config{
-		ParserMode: goparser.ParseComments,
-		Cwd:        cwd,
+	conf := &packages.Config{
+		Mode: packages.NeedName | packages.NeedSyntax | packages.NeedImports | packages.NeedDeps,
+		Dir:  cwd,
 	}
 
-	conf.Import(importPath)
-
-	loaderProgram, err := conf.Load()
+	loaded, err := packages.Load(conf, importPath)
 	if err != nil {
 		return err
 	}
 
-	for _, info := range loaderProgram.AllPackages {
-		pkgPath := strings.TrimPrefix(info.Pkg.Path(), "vendor/")
-		for _, astFile := range info.Files {
+	packages.Visit(loaded, nil, func(info *packages.Package) {
+		pkgPath := strings.TrimPrefix(info.PkgPath, "vendor/")
+		for _, astFile := range info.Syntax {
 			pkgDefs.parseTypesFromFile(astFile, pkgPath, nil)
 		}
-	}
+	})
 
 	return nil
 }
@@ -806,18 +804,4 @@ func (pkgDefs *PackagesDefinitions) checkJSONMarshal(pkg *packages.Package, obj 
 	if method != nil {
 		pkgDefs.debug.Printf("warning: %s.%s has MarshalJSON method, may need special handling", pkg.PkgPath, obj.Name())
 	}
-}
-
-func isAliasPkgName(file *ast.File, pkgName string) bool {
-	if file == nil && file.Imports == nil {
-		return false
-	}
-
-	for _, pkg := range file.Imports {
-		if pkg.Name != nil && pkg.Name.Name == pkgName {
-			return true
-		}
-	}
-
-	return false
 }

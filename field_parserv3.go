@@ -298,7 +298,7 @@ func (ps *tagBaseFieldParserV3) complementSchema(schema *spec.Schema, types []st
 		schema.Default = value
 	}
 
-	schema.Example = field.exampleValue
+	schema.Example = field.exampleValue //nolint:staticcheck // the deprecated `example` field is still emitted for OpenAPI 3.0 compatibility
 
 	if field.schemaType != ARRAY {
 		schema.Format = field.formatType
@@ -521,11 +521,7 @@ func (ps *tagBaseFieldParserV3) ShouldSkip() bool {
 
 	// json:"tag,hoge"
 	name := ps.JsonName()
-	if name == "" {
-		return true
-	}
-
-	return false
+	return name == ""
 }
 
 func (ps *tagBaseFieldParserV3) FieldName() (string, error) {

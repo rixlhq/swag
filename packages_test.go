@@ -2,9 +2,9 @@ package swag
 
 import (
 	"go/ast"
+	"go/build"
 	"go/token"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -220,7 +220,7 @@ func TestPackage_rangeFiles(t *testing.T) {
 			Name: &ast.Ident{Name: "bar.go"},
 		}: {
 			File:        &ast.File{Name: &ast.Ident{Name: "bar.go"}},
-			Path:        filepath.Join(runtime.GOROOT(), "bar.go"),
+			Path:        filepath.Join(build.Default.GOROOT, "bar.go"),
 			PackagePath: "bar",
 		},
 	}

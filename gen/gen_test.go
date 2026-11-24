@@ -237,7 +237,7 @@ func TestGen_BuildDescriptionWithQuotes(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	defer os.Remove("quotes.so")
+	defer func() { _ = os.Remove("quotes.so") }()
 
 	readDoc, err := p.Lookup("ReadDoc")
 	if err != nil {
@@ -298,7 +298,7 @@ func TestGen_BuildDocCustomDelims(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	defer os.Remove("delims.so")
+	defer func() { _ = os.Remove("delims.so") }()
 
 	readDoc, err := p.Lookup("ReadDoc")
 	if err != nil {
@@ -564,18 +564,6 @@ fmt.Print("Hello world")
 	assert.NotEqual(t, []byte(src2), res, "Should return fmt code")
 }
 
-type mockWriter struct {
-	hook func([]byte)
-}
-
-func (w *mockWriter) Write(data []byte) (int, error) {
-	if w.hook != nil {
-		w.hook(data)
-	}
-
-	return len(data), nil
-}
-
 func TestGen_GeneratedDoc(t *testing.T) {
 	config := &Config{
 		SearchDir:          searchDir,
@@ -715,7 +703,7 @@ func TestGen_TypeOverridesFile(t *testing.T) {
 	tmp, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 
 	config := &Config{
 		SearchDir:          searchDir,

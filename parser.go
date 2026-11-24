@@ -547,45 +547,6 @@ func (parser *Parser) ParseAPIMultiSearchDir(searchDirs []string, mainAPIFile st
 	return parser.checkOperationIDUniqueness()
 }
 
-func (parser *Parser) parseDeps(absMainAPIFilePath string, parseDepth int) error {
-	if parser.parseGoList {
-		pkgs, err := listPackages(context.Background(), []string{filepath.Dir(absMainAPIFilePath)}, nil, "-deps")
-		if err != nil {
-			return fmt.Errorf("pkg %s cannot find all dependencies, %s", filepath.Dir(absMainAPIFilePath), err)
-		}
-
-		length := len(pkgs)
-		for i := 0; i < length; i++ {
-			err := parser.getAllGoFileInfoFromDepsByList(pkgs[i], parser.ParseDependency)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		var t depth.Tree
-		t.ResolveInternal = true
-		t.MaxDepth = parseDepth
-		dirImported := make(map[string]struct{})
-
-		pkgName, err := getPkgName(absMainAPIFilePath)
-		if err != nil {
-			return fmt.Errorf("could not parse dependencies: %w", err)
-		}
-
-		if err = t.Resolve(pkgName); err != nil {
-			return fmt.Errorf("could not resolve dependencies: pkg %s cannot find all dependencies, %w", pkgName, err)
-		}
-
-		for i := 0; i < len(t.Root.Deps); i++ {
-			if err = parser.getAllGoFileInfoFromDeps(&t.Root.Deps[i], parser.ParseDependency, dirImported); err != nil {
-				return fmt.Errorf("could not parse dependencies: %w", err)
-			}
-		}
-	}
-
-	return nil
-}
-
 func getPkgName(searchDir string) (string, error) {
 	cmd := exec.Command("go", "list", "-f={{.ImportPath}}")
 	cmd.Dir = searchDir
@@ -727,30 +688,30 @@ func parseGeneralAPIInfo(parser *Parser, comments []string) error {
 			}
 		case "@tag.description":
 			if tag != nil {
-				tag.TagProps.Description = value
+				tag.Description = value
 			}
 		case "@tag.description.markdown":
 			if tag != nil {
-				commentInfo, err := getMarkdownForTag(tag.TagProps.Name, parser.markdownFileDir)
+				commentInfo, err := getMarkdownForTag(tag.Name, parser.markdownFileDir)
 				if err != nil {
 					return err
 				}
 
-				tag.TagProps.Description = string(commentInfo)
+				tag.Description = string(commentInfo)
 			}
 		case "@tag.docs.url":
 			if tag != nil {
-				tag.TagProps.ExternalDocs = &spec.ExternalDocumentation{
+				tag.ExternalDocs = &spec.ExternalDocumentation{
 					URL: value,
 				}
 			}
 		case "@tag.docs.description":
 			if tag != nil {
-				if tag.TagProps.ExternalDocs == nil {
+				if tag.ExternalDocs == nil {
 					return fmt.Errorf("%s needs to come after a @tags.docs.url", attribute)
 				}
 
-				tag.TagProps.ExternalDocs.Description = value
+				tag.ExternalDocs.Description = value
 			}
 		case secBasicAttr, secAPIKeyAttr, secApplicationAttr, secImplicitAttr, secPasswordAttr, secAccessCodeAttr:
 			scheme, err := parseSecAttributes(attribute, comments, &line)
@@ -797,7 +758,7 @@ func parseGeneralAPIInfo(parser *Parser, comments []string) error {
 				// for each security definition
 				for _, v := range parser.swagger.SecurityDefinitions {
 					// check if extension exists
-					_, extExistsInSecurityDef = v.VendorExtensible.Extensions.GetString(extensionName)
+					_, extExistsInSecurityDef = v.Extensions.GetString(extensionName)
 					// if it exists in at least one, then we stop iterating
 					if extExistsInSecurityDef {
 						break
@@ -1000,7 +961,7 @@ func parseSecurity(commentLine string) map[string][]string {
 
 		left, right := strings.Index(securityOption, "["), strings.Index(securityOption, "]")
 
-		if !(left == -1 && right == -1) {
+		if left != -1 || right != -1 {
 			scopes := securityOption[left+1 : right]
 
 			var options []string
@@ -1086,14 +1047,14 @@ func getMarkdownForTag(tagName string, dirPath string) ([]byte, error) {
 
 			commentInfo, err := os.ReadFile(fullPath)
 			if err != nil {
-				return nil, fmt.Errorf("Failed to read markdown file %s error: %s ", fullPath, err)
+				return nil, fmt.Errorf("failed to read markdown file %s: %w", fullPath, err)
 			}
 
 			return commentInfo, nil
 		}
 	}
 
-	return nil, fmt.Errorf("Unable to find markdown file for tag %s in the given directory", tagName)
+	return nil, fmt.Errorf("unable to find markdown file for tag %s in the given directory", tagName)
 }
 
 func isExistsScope(scope string) (bool, error) {
@@ -1329,14 +1290,14 @@ func processRouterOperation(parser *Parser, operation *Operation) error {
 		if len(operation.RouterProperties) > 1 {
 			newOp := *operation
 			var validParams []spec.Parameter
-			for _, param := range newOp.Operation.OperationProps.Parameters {
+			for _, param := range newOp.Parameters {
 				if param.In == "path" && !strings.Contains(routeProperties.Path, param.Name) {
 					// This path param is not actually contained in the path, skip adding it to the final params
 					continue
 				}
 				validParams = append(validParams, param)
 			}
-			newOp.Operation.OperationProps.Parameters = validParams
+			newOp.Parameters = validParams
 			*op = &newOp.Operation
 		} else {
 			*op = &operation.Operation
@@ -1791,7 +1752,7 @@ func (parser *Parser) parseStructField(file *ast.File, field *ast.Field) (map[st
 				properties[k] = v
 			}
 
-			return properties, schema.SchemaProps.Required, nil
+			return properties, schema.Required, nil
 		}
 		// for alias type of non-struct types ,such as array,map, etc. ignore field tag.
 		return map[string]spec.Schema{typeName: *schema}, nil, nil
@@ -2023,7 +1984,7 @@ func (parser *Parser) getAllGoFileInfo(packageDir, searchDir string) error {
 	}
 	return filepath.Walk(searchDir, func(path string, f os.FileInfo, wError error) error {
 		if wError != nil {
-			return fmt.Errorf("failed to access path %q, err: %v\n", path, wError)
+			return fmt.Errorf("failed to access path %q, err: %w", path, wError)
 		}
 		err := parser.Skip(path, f)
 		if err != nil {

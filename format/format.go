@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
 	"github.com/swaggo/swag/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 // Format implements `fmt` command for formatting swag comments in Go source
@@ -125,7 +125,7 @@ func write(path string, contents []byte) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 	if _, err := f.Write(contents); err != nil {
 		return err
 	}

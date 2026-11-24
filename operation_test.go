@@ -1335,11 +1335,12 @@ func TestParseParamCommentQueryArrayFormat(t *testing.T) {
 // Test ParseParamComment Query Params
 func TestParseParamCommentQueryArrayFormatWithStructTag(t *testing.T) {
 	parser := New()
-	parser.packages.ParseFile("test",
+	require.NoError(t, parser.packages.ParseFile("test",
 		"/test/test.go",
 		"package test\ntype MyQueryParams struct{Param []string `form:\"param\" collectionFormat:\"multi\"`}",
-		ParseAll)
-	parser.packages.ParseTypes()
+		ParseAll))
+	_, perr := parser.packages.ParseTypes()
+	require.NoError(t, perr)
 	comment := `@Param anyWhat query test.MyQueryParams true "List"`
 	operation := NewOperation(parser)
 	err := operation.ParseComment(comment, nil)
@@ -1364,11 +1365,12 @@ func TestParseParamCommentQuerySkipWithStructTag(t *testing.T) {
 	t.Parallel()
 
 	parser := New()
-	parser.packages.ParseFile("test",
+	require.NoError(t, parser.packages.ParseFile("test",
 		"/test/test.go",
 		"package test\ntype MyQueryParam struct{Param string `form:\"param\"`\nSkipField string `form:\"-\"`}",
-		ParseAll)
-	parser.packages.ParseTypes()
+		ParseAll))
+	_, perr := parser.packages.ParseTypes()
+	require.NoError(t, perr)
 	comment := `@Param anyWhat query test.MyQueryParam true "Parameter"`
 	operation := NewOperation(parser)
 	err := operation.ParseComment(comment, nil)
@@ -1389,11 +1391,12 @@ func TestParseParamCommentPathWithParamTag(t *testing.T) {
 	t.Parallel()
 
 	parser := New()
-	parser.packages.ParseFile("test",
+	require.NoError(t, parser.packages.ParseFile("test",
 		"/test/test.go",
 		"package test\ntype MyPathParam struct{ProjectID int `param:\"projectId\"`\nName string `param:\"name\"`}",
-		ParseAll)
-	parser.packages.ParseTypes()
+		ParseAll))
+	_, perr := parser.packages.ParseTypes()
+	require.NoError(t, perr)
 	comment := `@Param anyWhat path test.MyPathParam true "Parameter"`
 	operation := NewOperation(parser)
 	err := operation.ParseComment(comment, nil)
@@ -2085,16 +2088,16 @@ func TestParseParamCommentByExampleUnsupportedType(t *testing.T) {
 	t.Parallel()
 	var param spec.Parameter
 
-	setExample(&param, "something", "random value")
+	require.NoError(t, setExample(&param, "something", "random value"))
 	assert.Equal(t, param.Example, nil)
 
-	setExample(&param, STRING, "string value")
+	require.NoError(t, setExample(&param, STRING, "string value"))
 	assert.Equal(t, param.Example, "string value")
 
-	setExample(&param, INTEGER, "10")
+	require.NoError(t, setExample(&param, INTEGER, "10"))
 	assert.Equal(t, param.Example, 10)
 
-	setExample(&param, NUMBER, "10")
+	require.NoError(t, setExample(&param, NUMBER, "10"))
 	assert.Equal(t, param.Example, float64(10))
 }
 
@@ -2126,23 +2129,23 @@ func TestParseParamCommentBySchemaExampleUnsupportedType(t *testing.T) {
 	t.Parallel()
 	var param spec.Parameter
 
-	setSchemaExample(&param, "something", "random value")
+	require.NoError(t, setSchemaExample(&param, "something", "random value"))
 	assert.Nil(t, param.Schema)
 
-	setSchemaExample(&param, STRING, "string value")
+	require.NoError(t, setSchemaExample(&param, STRING, "string value"))
 	assert.Nil(t, param.Schema)
 
 	param.Schema = &spec.Schema{}
-	setSchemaExample(&param, STRING, "string value")
+	require.NoError(t, setSchemaExample(&param, STRING, "string value"))
 	assert.Equal(t, "string value", param.Schema.Example)
 
-	setSchemaExample(&param, INTEGER, "10")
+	require.NoError(t, setSchemaExample(&param, INTEGER, "10"))
 	assert.Equal(t, 10, param.Schema.Example)
 
-	setSchemaExample(&param, NUMBER, "10")
+	require.NoError(t, setSchemaExample(&param, NUMBER, "10"))
 	assert.Equal(t, float64(10), param.Schema.Example)
 
-	setSchemaExample(&param, STRING, "string \\r\\nvalue")
+	require.NoError(t, setSchemaExample(&param, STRING, "string \\r\\nvalue"))
 	assert.Equal(t, "string \r\nvalue", param.Schema.Example)
 }
 
@@ -2190,7 +2193,7 @@ func TestParseAndExtractionParamAttribute(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, float64(0), *numberParam.Minimum)
 	assert.Equal(t, float64(100), *numberParam.Maximum)
-	assert.Equal(t, "csv", numberParam.SimpleSchema.Format)
+	assert.Equal(t, "csv", numberParam.Format)
 	assert.Equal(t, float64(1), numberParam.Default)
 
 	err = op.parseParamAttribute(" minlength(1)", "", NUMBER, "", nil)
@@ -2210,7 +2213,7 @@ func TestParseAndExtractionParamAttribute(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), *stringParam.MinLength)
 	assert.Equal(t, int64(100), *stringParam.MaxLength)
-	assert.Equal(t, "csv", stringParam.SimpleSchema.Format)
+	assert.Equal(t, "csv", stringParam.Format)
 	err = op.parseParamAttribute(" minimum(0)", "", STRING, "", nil)
 	assert.Error(t, err)
 

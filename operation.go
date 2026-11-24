@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/ast"
-	goparser "go/parser"
 	"go/token"
 	"log"
 	"net/http"
@@ -15,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/go-openapi/spec"
-	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/go/packages"
 	"gopkg.in/yaml.v3"
 )
 
@@ -303,7 +302,7 @@ func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.F
 	case "path", "header", "query", "formData":
 		switch objectType {
 		case ARRAY:
-			if !IsPrimitiveType(refType) && !(refType == "file" && paramType == "formData") {
+			if !IsPrimitiveType(refType) && (refType != "file" || paramType != "formData") {
 				return fmt.Errorf("%s is not supported array type for %s", refType, paramType)
 			}
 		case PRIMITIVE:
@@ -332,18 +331,18 @@ func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.F
 				// load overridden type specific name from extensions if exists
 				// query params check "query" extension first, then fall back to "formData"
 				if paramType == "query" {
-					if nameVal, ok := item.Schema.Extensions.GetString(queryTag); ok {
+					if nameVal, ok := item.Extensions.GetString(queryTag); ok {
 						name = nameVal
 						if name == "-" {
 							continue
 						}
-					} else if nameVal, ok := item.Schema.Extensions.GetString("formData"); ok {
+					} else if nameVal, ok := item.Extensions.GetString("formData"); ok {
 						name = nameVal
 						if name == "-" {
 							continue
 						}
 					}
-				} else if nameVal, ok := item.Schema.Extensions.GetString(paramType); ok {
+				} else if nameVal, ok := item.Extensions.GetString(paramType); ok {
 					name = nameVal
 					if name == "-" {
 						continue
@@ -386,19 +385,19 @@ func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.F
 				param.Default = prop.Default
 				param.Example = prop.Example
 				param.Extensions = prop.Extensions
-				param.CommonValidations.Maximum = prop.Maximum
-				param.CommonValidations.Minimum = prop.Minimum
-				param.CommonValidations.ExclusiveMaximum = prop.ExclusiveMaximum
-				param.CommonValidations.ExclusiveMinimum = prop.ExclusiveMinimum
-				param.CommonValidations.MaxLength = prop.MaxLength
-				param.CommonValidations.MinLength = prop.MinLength
-				param.CommonValidations.Pattern = prop.Pattern
-				param.CommonValidations.MaxItems = prop.MaxItems
-				param.CommonValidations.MinItems = prop.MinItems
-				param.CommonValidations.UniqueItems = prop.UniqueItems
-				param.CommonValidations.MultipleOf = prop.MultipleOf
-				param.CommonValidations.Enum = prop.Enum
-				operation.Operation.Parameters = append(operation.Operation.Parameters, param)
+				param.Maximum = prop.Maximum
+				param.Minimum = prop.Minimum
+				param.ExclusiveMaximum = prop.ExclusiveMaximum
+				param.ExclusiveMinimum = prop.ExclusiveMinimum
+				param.MaxLength = prop.MaxLength
+				param.MinLength = prop.MinLength
+				param.Pattern = prop.Pattern
+				param.MaxItems = prop.MaxItems
+				param.MinItems = prop.MinItems
+				param.UniqueItems = prop.UniqueItems
+				param.MultipleOf = prop.MultipleOf
+				param.Enum = prop.Enum
+				operation.Parameters = append(operation.Parameters, param)
 			}
 
 			return nil
@@ -424,7 +423,7 @@ func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.F
 		return err
 	}
 
-	operation.Operation.Parameters = append(operation.Operation.Parameters, param)
+	operation.Parameters = append(operation.Parameters, param)
 
 	return nil
 }
@@ -790,7 +789,7 @@ func (operation *Operation) ParseSecurityComment(commentLine string) error {
 
 		left, right := strings.Index(securityOption, "["), strings.Index(securityOption, "]")
 
-		if !(left == -1 && right == -1) {
+		if left != -1 || right != -1 {
 			scopes := securityOption[left+1 : right]
 
 			var options []string
@@ -821,37 +820,33 @@ func findTypeDef(importPath, typeName string) (*ast.TypeSpec, error) {
 		return nil, err
 	}
 
-	conf := loader.Config{
-		ParserMode: goparser.SpuriousErrors,
-		Cwd:        cwd,
+	conf := &packages.Config{
+		Mode: packages.NeedName | packages.NeedSyntax,
+		Dir:  cwd,
 	}
 
-	conf.Import(importPath)
-
-	lprog, err := conf.Load()
+	loaded, err := packages.Load(conf, importPath)
 	if err != nil {
 		return nil, err
 	}
 
+	var pkgInfo *packages.Package
+
 	// If the pkg is vendored, the actual pkg path is going to resemble
 	// something like "{importPath}/vendor/{importPath}"
-	for k := range lprog.AllPackages {
-		realPkgPath := k.Path()
-
-		if strings.Contains(realPkgPath, "vendor/"+importPath) {
-			importPath = realPkgPath
+	for _, p := range loaded {
+		if p.PkgPath == importPath || strings.Contains(p.PkgPath, "vendor/"+importPath) {
+			pkgInfo = p
 		}
 	}
-
-	pkgInfo := lprog.Package(importPath)
 
 	if pkgInfo == nil {
 		return nil, fmt.Errorf("package was nil")
 	}
 
 	// TODO: possibly cache pkgInfo since it's an expensive operation
-	for i := range pkgInfo.Files {
-		for _, astDeclaration := range pkgInfo.Files[i].Decls {
+	for i := range pkgInfo.Syntax {
+		for _, astDeclaration := range pkgInfo.Syntax[i].Decls {
 			generalDeclaration, ok := astDeclaration.(*ast.GenDecl)
 			if ok && generalDeclaration.Tok == token.TYPE {
 				for _, astSpec := range generalDeclaration.Specs {
@@ -935,11 +930,12 @@ func parseFields(s string) []string {
 	nestLevel := 0
 
 	return strings.FieldsFunc(s, func(char rune) bool {
-		if char == '{' {
+		switch char {
+		case '{':
 			nestLevel++
 
 			return false
-		} else if char == '}' {
+		case '}':
 			nestLevel--
 
 			return false
@@ -1282,7 +1278,7 @@ func getCodeExampleForSummary(summaryName string, dirPath string) ([]byte, bool,
 
 			commentInfo, err := os.ReadFile(fullPath)
 			if err != nil {
-				return nil, false, fmt.Errorf("Failed to read code example file %s error: %s ", fullPath, err)
+				return nil, false, fmt.Errorf("failed to read code example file %s: %w", fullPath, err)
 			}
 
 			return commentInfo, isJSON, nil

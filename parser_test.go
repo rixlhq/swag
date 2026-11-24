@@ -2343,14 +2343,14 @@ func TestParseGoList(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				defer f.Close()
+				defer func() { _ = f.Close() }()
 				_, err = f.Write([]byte(`package invalid
 
 function a() {}`))
 				if err != nil {
 					return err
 				}
-				defer os.Remove(mockErrGoFile)
+				defer func() { _ = os.Remove(mockErrGoFile) }()
 				return p.ParseAPI(searchDir, mainAPIFile, defaultParseDepth)
 			},
 		},
@@ -2365,14 +2365,14 @@ function a() {}`))
 				if err != nil {
 					return err
 				}
-				defer f.Close()
+				defer func() { _ = f.Close() }()
 				_, err = f.Write([]byte(`package invalid
 
 function a() {}`))
 				if err != nil {
 					return err
 				}
-				defer os.Remove(mockErrGoFile)
+				defer func() { _ = os.Remove(mockErrGoFile) }()
 				return p.ParseAPI(searchDir, mainAPIFile, defaultParseDepth)
 			},
 		},
@@ -2381,12 +2381,12 @@ function a() {}`))
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if c.gomodule {
-				os.Setenv("GO111MODULE", "on")
+				_ = os.Setenv("GO111MODULE", "on")
 			} else {
-				os.Setenv("GO111MODULE", "off")
+				_ = os.Setenv("GO111MODULE", "off")
 			}
 			err := c.run(c.searchDir)
-			os.Setenv("GO111MODULE", go111moduleEnv)
+			_ = os.Setenv("GO111MODULE", go111moduleEnv)
 			if c.err == nil {
 				assert.NoError(t, err)
 			} else {
@@ -3086,18 +3086,18 @@ func TestApiParseTag(t *testing.T) {
 	}
 
 	dogs := p.swagger.Tags[0]
-	if dogs.TagProps.Name != "dogs" || dogs.TagProps.Description != "Dogs are cool" {
+	if dogs.Name != "dogs" || dogs.Description != "Dogs are cool" {
 		t.Error("Failed to parse dogs name or description")
 	}
 
 	cats := p.swagger.Tags[1]
-	if cats.TagProps.Name != "cats" || cats.TagProps.Description != "Cats are the devil" {
+	if cats.Name != "cats" || cats.Description != "Cats are the devil" {
 		t.Error("Failed to parse cats name or description")
 	}
 
-	if cats.TagProps.ExternalDocs.URL != "https://google.de" || cats.TagProps.ExternalDocs.Description != "google is super useful to find out that cats are evil!" {
-		t.Error("URL: ", cats.TagProps.ExternalDocs.URL)
-		t.Error("Description: ", cats.TagProps.ExternalDocs.Description)
+	if cats.ExternalDocs.URL != "https://google.de" || cats.ExternalDocs.Description != "google is super useful to find out that cats are evil!" {
+		t.Error("URL: ", cats.ExternalDocs.URL)
+		t.Error("Description: ", cats.ExternalDocs.Description)
 		t.Error("Failed to parse cats external documentation")
 	}
 }
@@ -3128,7 +3128,7 @@ func TestParseTagMarkdownDescription(t *testing.T) {
 	}
 
 	apes := p.swagger.Tags[2]
-	if apes.TagProps.Description == "" {
+	if apes.Description == "" {
 		t.Error("Failed to parse tag description markdown file")
 	}
 }
@@ -3144,8 +3144,8 @@ func TestApiParseTag_Filtered(t *testing.T) {
 	assert.NoError(t, err)
 
 	if assert.Len(t, p.swagger.Tags, 2) {
-		assert.Equal(t, "dogs", p.swagger.Tags[0].TagProps.Name)
-		assert.Equal(t, "apes", p.swagger.Tags[1].TagProps.Name)
+		assert.Equal(t, "dogs", p.swagger.Tags[0].Name)
+		assert.Equal(t, "apes", p.swagger.Tags[1].Name)
 	}
 }
 
@@ -3420,14 +3420,14 @@ func Fun()  {
 	assert.NoError(t, err)
 	teacher, ok := p.swagger.Definitions["Teacher"]
 	assert.True(t, ok)
-	ref := teacher.Properties["child"].SchemaProps.Ref
+	ref := teacher.Properties["child"].Ref
 	assert.Equal(t, "#/definitions/Student", ref.String())
 	_, ok = p.swagger.Definitions["Student"]
 	assert.True(t, ok)
 	path, ok := p.swagger.Paths.Paths["/test"]
 	assert.True(t, ok)
 	assert.Equal(t, "#/definitions/Teacher", path.Get.Parameters[0].Schema.Ref.String())
-	ref = path.Get.Responses.ResponsesProps.StatusCodeResponses[200].ResponseProps.Schema.Ref
+	ref = path.Get.Responses.StatusCodeResponses[200].Schema.Ref
 	assert.Equal(t, "#/definitions/Teacher", ref.String())
 }
 
@@ -4131,7 +4131,7 @@ func TestGetFuncDoc_NilPointerSafety(t *testing.T) {
 				Values: []ast.Expr{
 					&ast.Ident{
 						Name: "test",
-						Obj: &ast.Object{
+						Obj: &ast.Object{ //nolint:staticcheck // test input relies on go/parser-resolved ident objects
 							Decl: nil, // nil declaration
 						},
 					},
@@ -4174,7 +4174,7 @@ func TestGetFieldType(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "User", field)
 
-	field, err = getFieldType(&ast.File{}, &ast.StarExpr{X: &ast.FuncType{}}, nil)
+	_, err = getFieldType(&ast.File{}, &ast.StarExpr{X: &ast.FuncType{}}, nil)
 	assert.Error(t, err)
 
 	field, err = getFieldType(&ast.File{}, &ast.StarExpr{X: &ast.SelectorExpr{X: &ast.Ident{Name: "models"}, Sel: &ast.Ident{Name: "User"}}}, nil)
@@ -4183,14 +4183,9 @@ func TestGetFieldType(t *testing.T) {
 }
 
 func TestTryAddDescription(t *testing.T) {
-	type args struct {
-		spec       *spec.SecurityScheme
-		extensions map[string]interface{}
-	}
 	tests := []struct {
 		name  string
 		lines []string
-		args  args
 		want  *spec.SecurityScheme
 	}{
 		{
@@ -4575,12 +4570,12 @@ var Func2 = Func
 	val, ok := p.swagger.Paths.Paths["/test"]
 	assert.True(t, ok)
 	assert.NotNil(t, val.Get)
-	assert.Equal(t, val.Get.OperationProps.Summary, "generate var-defined functions' doc")
+	assert.Equal(t, val.Get.Summary, "generate var-defined functions' doc")
 
 	val2, ok := p.swagger.Paths.Paths["/test2"]
 	assert.True(t, ok)
 	assert.NotNil(t, val2.Get)
-	assert.Equal(t, val2.Get.OperationProps.Summary, "generate indirectly pointing")
+	assert.Equal(t, val2.Get.Summary, "generate indirectly pointing")
 }
 
 func TestParser_DescriptionLineContinuation(t *testing.T) {
