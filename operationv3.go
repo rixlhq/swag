@@ -20,21 +20,21 @@ type parsedDiscriminator struct {
 }
 
 const (
-	mediaTypeJSON                  = "application/json"
-	mediaTypeMultipartForm         = "multipart/form-data"
-	mediaTypeFormURLEncoded        = "application/x-www-form-urlencoded"
-	mediaTypeTextXML               = "text/xml"
-	mediaTypeTextPlain             = "text/plain"
-	mediaTypeOctetStream           = "application/octet-stream"
-	mediaTypePDF                   = "application/pdf"
-	mediaTypeMSExcel               = "application/msexcel"
-	mediaTypeZIP                   = "application/zip"
-	mediaTypePNG                   = "image/png"
-	mediaTypeJPEG                  = "image/jpeg"
-	mediaTypeGIF                   = "image/gif"
-	mediaTypeWordDocument          = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-	mediaTypeSpreadsheetDocument   = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-	mediaTypePresentationDocument  = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+	mediaTypeJSON                 = "application/json"
+	mediaTypeMultipartForm        = "multipart/form-data"
+	mediaTypeFormURLEncoded       = "application/x-www-form-urlencoded"
+	mediaTypeTextXML              = "text/xml"
+	mediaTypeTextPlain            = "text/plain"
+	mediaTypeOctetStream          = "application/octet-stream"
+	mediaTypePDF                  = "application/pdf"
+	mediaTypeMSExcel              = "application/msexcel"
+	mediaTypeZIP                  = "application/zip"
+	mediaTypePNG                  = "image/png"
+	mediaTypeJPEG                 = "image/jpeg"
+	mediaTypeGIF                  = "image/gif"
+	mediaTypeWordDocument         = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	mediaTypeSpreadsheetDocument  = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	mediaTypePresentationDocument = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 )
 
 var objectLikeBodyMediaTypes = map[string]struct{}{
@@ -395,7 +395,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	})
 	applyExplicitSerializationFlagsToParameter(item.Spec)
 
-	o.Operation.Parameters = append(o.Operation.Parameters, item)
+	o.Parameters = append(o.Parameters, item)
 
 	return nil
 }
@@ -450,7 +450,7 @@ func (o *OperationV3) expandQueryObjectParamsV3(refType, paramType string, enums
 
 		listItem := spec.NewRefOrSpec(nil, &spec.Extendable[spec.Parameter]{Spec: &itemParam})
 		applyExplicitSerializationFlagsToParameter(listItem.Spec)
-		o.Operation.Parameters = append(o.Operation.Parameters, listItem)
+		o.Parameters = append(o.Parameters, listItem)
 	}
 
 	return nil
@@ -952,9 +952,9 @@ func setSchemaExampleV3(param *spec.Schema, schemaType string, value string) err
 	switch v := val.(type) {
 	case string:
 		//  replaces \r \n \t in example string values.
-		param.Example = strings.NewReplacer(`\r`, "\r", `\n`, "\n", `\t`, "\t").Replace(v)
+		param.Example = strings.NewReplacer(`\r`, "\r", `\n`, "\n", `\t`, "\t").Replace(v) //nolint:staticcheck // the deprecated `example` field is still emitted for OpenAPI 3.0 compatibility
 	default:
-		param.Example = val
+		param.Example = val //nolint:staticcheck // the deprecated `example` field is still emitted for OpenAPI 3.0 compatibility
 	}
 
 	return nil
@@ -1535,7 +1535,7 @@ func parseCombinedObjectSchemaV3(parser *Parser, refType string, astFile *ast.Fi
 
 	schemaRefPath := strings.Replace(schema.Ref.Ref, "#/components/schemas/", "", 1)
 	schemaSpec := parser.openAPI.Components.Spec.Schemas[schemaRefPath]
-	schemaSpec.Spec.JsonSchemaComposition.AllOf = make([]*spec.RefOrSpec[spec.Schema], len(props))
+	schemaSpec.Spec.AllOf = make([]*spec.RefOrSpec[spec.Schema], len(props))
 
 	i := 0
 	for name, prop := range props {
@@ -1550,7 +1550,7 @@ func parseCombinedObjectSchemaV3(parser *Parser, refType string, astFile *ast.Fi
 
 		ref := spec.NewRefOrSpec[spec.Schema](spec.NewRef("#/components/schemas/"+name), nil)
 
-		schemaSpec.Spec.JsonSchemaComposition.AllOf[i] = ref
+		schemaSpec.Spec.AllOf[i] = ref
 		i++
 	}
 
@@ -1569,7 +1569,7 @@ func (o *OperationV3) ParseSecurityComment(commentLine string) error {
 
 		left, right := strings.Index(securityOption, "["), strings.Index(securityOption, "]")
 
-		if !(left == -1 && right == -1) {
+		if left != -1 || right != -1 {
 			scopes := securityOption[left+1 : right]
 
 			var options []string

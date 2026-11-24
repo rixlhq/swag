@@ -198,7 +198,7 @@ func (g *Gen) Build(config *Config) error {
 		overridesFile, err := open(config.OverridesFile)
 		if err != nil {
 			// Don't bother reporting if the default file is missing; assume there are no overrides
-			if !(config.OverridesFile == DefaultOverridesFile && os.IsNotExist(err)) {
+			if config.OverridesFile != DefaultOverridesFile || !os.IsNotExist(err) {
 				return fmt.Errorf("could not open overrides file: %w", err)
 			}
 		} else {
@@ -298,7 +298,7 @@ func (g *Gen) writeDoc(config *Config, doc interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer docs.Close()
+	defer func() { _ = docs.Close() }()
 
 	// Write doc
 	switch spec := doc.(type) {
@@ -386,7 +386,7 @@ func (g *Gen) writeFile(b []byte, file string) error {
 		return err
 	}
 
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = f.Write(b)
 
@@ -453,7 +453,7 @@ func (g *Gen) writeGoDoc(packageName string, output io.Writer, swagger *v2.Swagg
 			// Add schemes
 			v = "{\n    \"schemes\": " + config.LeftTemplateDelim + " marshal .Schemes " + config.RightTemplateDelim + "," + v[1:]
 			// Sanitize backticks
-			return strings.Replace(v, "`", "`+\"`\"+`", -1)
+			return strings.ReplaceAll(v, "`", "`+\"`\"+`")
 		},
 	}).ParseFS(tmpl, "src/*.tmpl")
 	if err != nil {
@@ -553,7 +553,7 @@ func (g *Gen) writeGoDocV3(packageName string, output io.Writer, openAPI *v3.Ope
 			// Add schemes
 			v = "{\n    \"schemes\": " + config.LeftTemplateDelim + " marshal .Schemes " + config.RightTemplateDelim + "," + v[1:]
 			// Sanitize backticks
-			return strings.Replace(v, "`", "`+\"`\"+`", -1)
+			return strings.ReplaceAll(v, "`", "`+\"`\"+`")
 		},
 	}).ParseFS(tmpl, "src/*.tmpl")
 	if err != nil {

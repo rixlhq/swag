@@ -21,5 +21,5 @@ import (
 
 func main() {
 	http.HandleFunc("/testapi/update-product", UpdateProduct)
-	http.ListenAndServe(":8080", nil)
+	_ = http.ListenAndServe(":8080", nil)
 }

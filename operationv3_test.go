@@ -16,7 +16,6 @@ var typeObject = spec.SingleOrArray[string](spec.SingleOrArray[string]{OBJECT})
 var typeArray = spec.SingleOrArray[string](spec.SingleOrArray[string]{ARRAY})
 var typeInteger = spec.SingleOrArray[string](spec.SingleOrArray[string]{INTEGER})
 var typeString = spec.SingleOrArray[string](spec.SingleOrArray[string]{STRING})
-var typeFile = spec.SingleOrArray[string](spec.SingleOrArray[string]{"file"})
 var typeNumber = spec.SingleOrArray[string](spec.SingleOrArray[string]{NUMBER})
 var typeBool = spec.SingleOrArray[string](spec.SingleOrArray[string]{BOOLEAN})
 
@@ -969,7 +968,7 @@ func TestParseParamCommentArrayV3(t *testing.T) {
 			err := operation.ParseComment(`@Param names `+paramType+` []string true "Users List"`, nil)
 			assert.NoError(t, err)
 
-			parameters := operation.Operation.Parameters
+			parameters := operation.Parameters
 			assert.NotNil(t, parameters)
 
 			parameterSpec := parameters[0].Spec.Spec
@@ -994,7 +993,7 @@ func TestParseParamCommentDefaultValueV3(t *testing.T) {
 	err := operation.ParseComment(`@Param names query string true "Users List" default(test)`, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1015,7 +1014,7 @@ func TestParseParamCommentQueryArrayFormatV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1038,7 +1037,7 @@ func TestParseParamCommentQueryArrayDefaultFormatV3(t *testing.T) {
 	err := operation.ParseComment(`@Param names query []string true "Users List"`, nil)
 	require.NoError(t, err)
 
-	parameterSpec := operation.Operation.Parameters[0].Spec.Spec
+	parameterSpec := operation.Parameters[0].Spec.Spec
 	assert.Equal(t, "form", parameterSpec.Style)
 	assert.True(t, parameterSpec.Explode)
 }
@@ -1050,7 +1049,7 @@ func TestParseParamCommentQueryArrayStyleExplodeV3(t *testing.T) {
 	err := operation.ParseComment(`@Param names query []string true "Users List" style(form) explode(false) allowReserved(true)`, nil)
 	require.NoError(t, err)
 
-	item := operation.Operation.Parameters[0]
+	item := operation.Parameters[0]
 	parameterSpec := item.Spec.Spec
 	assert.Equal(t, "form", parameterSpec.Style)
 	assert.False(t, parameterSpec.Explode)
@@ -1071,7 +1070,7 @@ func TestParseParamCommentByIDV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1092,7 +1091,7 @@ func TestParseParamCommentByQueryTypeV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1451,7 +1450,7 @@ func TestParseParamCommentByEnumsV3(t *testing.T) {
 
 		assert.Len(t, operation.Parameters, 1)
 
-		parameters := operation.Operation.Parameters
+		parameters := operation.Parameters
 		assert.NotNil(t, parameters)
 
 		parameterSpec := parameters[0].Spec.Spec
@@ -1474,7 +1473,7 @@ func TestParseParamCommentByEnumsV3(t *testing.T) {
 		err := operation.ParseComment(comment, nil)
 		assert.NoError(t, err)
 
-		parameters := operation.Operation.Parameters
+		parameters := operation.Parameters
 		assert.NotNil(t, parameters)
 
 		parameterSpec := parameters[0].Spec.Spec
@@ -1497,7 +1496,7 @@ func TestParseParamCommentByEnumsV3(t *testing.T) {
 		err := operation.ParseComment(comment, nil)
 		assert.NoError(t, err)
 
-		parameters := operation.Operation.Parameters
+		parameters := operation.Parameters
 		assert.NotNil(t, parameters)
 
 		parameterSpec := parameters[0].Spec.Spec
@@ -1520,7 +1519,7 @@ func TestParseParamCommentByEnumsV3(t *testing.T) {
 		err := operation.ParseComment(comment, nil)
 		assert.NoError(t, err)
 
-		parameters := operation.Operation.Parameters
+		parameters := operation.Parameters
 		assert.NotNil(t, parameters)
 
 		parameterSpec := parameters[0].Spec.Spec
@@ -1560,7 +1559,7 @@ func TestParseParamCommentByMaxLengthV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1588,7 +1587,7 @@ func TestParseParamCommentByMinLengthV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1616,7 +1615,7 @@ func TestParseParamCommentByMinimumV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1647,7 +1646,7 @@ func TestParseParamCommentByMaximumV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1678,7 +1677,7 @@ func TestParseParamCommentByDefaultV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1700,7 +1699,7 @@ func TestParseParamCommentByExampleIntV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1722,7 +1721,7 @@ func TestParseParamCommentByExampleStringV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1751,7 +1750,7 @@ func TestParseParamCommentBySchemaExampleStringV3(t *testing.T) {
 	assert.NotNil(t, requestBodySpec)
 	assert.Equal(t, "Some ID", requestBodySpec.Description)
 	assert.True(t, requestBodySpec.Required)
-	assert.Equal(t, "True feelings", requestBodySpec.Content["text/plain"].Spec.Schema.Spec.Example)
+	assert.Equal(t, "True feelings", requestBodySpec.Content["text/plain"].Spec.Schema.Spec.Example) //nolint:staticcheck // test verifies the deprecated `example` field is still emitted
 	assert.Equal(t, &typeString, requestBodySpec.Content["text/plain"].Spec.Schema.Spec.Type)
 }
 
@@ -1759,24 +1758,24 @@ func TestParseParamCommentBySchemaExampleUnsupportedTypeV3(t *testing.T) {
 	t.Parallel()
 	var param spec.Parameter
 
-	setSchemaExampleV3(nil, "something", "random value")
+	require.NoError(t, setSchemaExampleV3(nil, "something", "random value"))
 	assert.Nil(t, param.Schema)
 
-	setSchemaExampleV3(nil, STRING, "string value")
+	require.NoError(t, setSchemaExampleV3(nil, STRING, "string value"))
 	assert.Nil(t, param.Schema)
 
 	param.Schema = spec.NewSchemaSpec()
-	setSchemaExampleV3(param.Schema.Spec, STRING, "string value")
-	assert.Equal(t, "string value", param.Schema.Spec.Example)
+	require.NoError(t, setSchemaExampleV3(param.Schema.Spec, STRING, "string value"))
+	assert.Equal(t, "string value", param.Schema.Spec.Example) //nolint:staticcheck // test verifies the deprecated `example` field is still emitted
 
-	setSchemaExampleV3(param.Schema.Spec, INTEGER, "10")
-	assert.Equal(t, 10, param.Schema.Spec.Example)
+	require.NoError(t, setSchemaExampleV3(param.Schema.Spec, INTEGER, "10"))
+	assert.Equal(t, 10, param.Schema.Spec.Example) //nolint:staticcheck // test verifies the deprecated `example` field is still emitted
 
-	setSchemaExampleV3(param.Schema.Spec, NUMBER, "10")
-	assert.Equal(t, float64(10), param.Schema.Spec.Example)
+	require.NoError(t, setSchemaExampleV3(param.Schema.Spec, NUMBER, "10"))
+	assert.Equal(t, float64(10), param.Schema.Spec.Example) //nolint:staticcheck // test verifies the deprecated `example` field is still emitted
 
-	setSchemaExampleV3(param.Schema.Spec, STRING, "string \\r\\nvalue")
-	assert.Equal(t, "string \r\nvalue", param.Schema.Spec.Example)
+	require.NoError(t, setSchemaExampleV3(param.Schema.Spec, STRING, "string \\r\\nvalue"))
+	assert.Equal(t, "string \r\nvalue", param.Schema.Spec.Example) //nolint:staticcheck // test verifies the deprecated `example` field is still emitted
 }
 
 func TestParseParamArrayWithEnumsV3(t *testing.T) {
@@ -1788,7 +1787,7 @@ func TestParseParamArrayWithEnumsV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1878,7 +1877,7 @@ func TestParseParamCommentByExtensionsV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 	assert.NoError(t, err)
 
-	parameters := operation.Operation.Parameters
+	parameters := operation.Parameters
 	assert.NotNil(t, parameters)
 
 	parameterSpec := parameters[0].Spec.Spec
@@ -1901,7 +1900,7 @@ func TestParseIdCommentV3(t *testing.T) {
 	err := operation.ParseComment(comment, nil)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "myOperationId", operation.Operation.OperationID)
+	assert.Equal(t, "myOperationId", operation.OperationID)
 }
 
 func TestParseSecurityCommentV3(t *testing.T) {

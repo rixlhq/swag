@@ -59,11 +59,8 @@ func (ps *tagBaseFieldParser) ShouldSkip() bool {
 
 	// json:"tag,hoge"
 	name := strings.TrimSpace(strings.Split(ps.tag.Get(jsonTag), ",")[0])
-	if name == "-" {
-		return true
-	}
 
-	return false
+	return name == "-"
 }
 
 func (ps *tagBaseFieldParser) FieldNames() ([]string, error) {

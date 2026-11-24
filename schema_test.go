@@ -103,7 +103,7 @@ func TestBuildCustomSchema(t *testing.T) {
 
 	schema, err = BuildCustomSchema([]string{"primitive", "string"})
 	assert.NoError(t, err)
-	assert.Equal(t, schema.SchemaProps.Type, spec.StringOrArray{"string"})
+	assert.Equal(t, schema.Type, spec.StringOrArray{"string"})
 
 	schema, err = BuildCustomSchema([]string{"array"})
 	assert.Error(t, err)
@@ -115,12 +115,12 @@ func TestBuildCustomSchema(t *testing.T) {
 
 	schema, err = BuildCustomSchema([]string{"array", "string"})
 	assert.NoError(t, err)
-	assert.Equal(t, schema.SchemaProps.Type, spec.StringOrArray{"array"})
-	assert.Equal(t, schema.SchemaProps.Items.Schema.SchemaProps.Type, spec.StringOrArray{"string"})
+	assert.Equal(t, schema.Type, spec.StringOrArray{"array"})
+	assert.Equal(t, schema.Items.Schema.Type, spec.StringOrArray{"string"})
 
 	schema, err = BuildCustomSchema([]string{"object"})
 	assert.NoError(t, err)
-	assert.Equal(t, schema.SchemaProps.Type, spec.StringOrArray{"object"})
+	assert.Equal(t, schema.Type, spec.StringOrArray{"object"})
 
 	schema, err = BuildCustomSchema([]string{"object", "oops"})
 	assert.Error(t, err)
@@ -128,8 +128,8 @@ func TestBuildCustomSchema(t *testing.T) {
 
 	schema, err = BuildCustomSchema([]string{"object", "string"})
 	assert.NoError(t, err)
-	assert.Equal(t, schema.SchemaProps.Type, spec.StringOrArray{"object"})
-	assert.Equal(t, schema.SchemaProps.AdditionalProperties.Schema.Type, spec.StringOrArray{"string"})
+	assert.Equal(t, schema.Type, spec.StringOrArray{"object"})
+	assert.Equal(t, schema.AdditionalProperties.Schema.Type, spec.StringOrArray{"string"})
 }
 
 func TestIsNumericType(t *testing.T) {

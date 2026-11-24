@@ -252,7 +252,7 @@ func TestGetGenericFieldType(t *testing.T) {
 	field, err := getFieldType(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.IndexListExpr{
-			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}},
+			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}}, //nolint:staticcheck // test input relies on go/parser-resolved ident objects
 			Indices: []ast.Expr{&ast.Ident{Name: "string"}},
 		},
 		nil,
@@ -263,7 +263,7 @@ func TestGetGenericFieldType(t *testing.T) {
 	field, err = getFieldType(
 		&ast.File{Name: &ast.Ident{}},
 		&ast.IndexListExpr{
-			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}},
+			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}}, //nolint:staticcheck // test input relies on go/parser-resolved ident objects
 			Indices: []ast.Expr{&ast.Ident{Name: "string"}},
 		},
 		nil,
@@ -274,7 +274,7 @@ func TestGetGenericFieldType(t *testing.T) {
 	field, err = getFieldType(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.IndexListExpr{
-			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}},
+			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}}, //nolint:staticcheck // test input relies on go/parser-resolved ident objects
 			Indices: []ast.Expr{&ast.Ident{Name: "string"}, &ast.Ident{Name: "int"}},
 		},
 		nil,
@@ -285,7 +285,7 @@ func TestGetGenericFieldType(t *testing.T) {
 	field, err = getFieldType(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.IndexListExpr{
-			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}},
+			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}}, //nolint:staticcheck // test input relies on go/parser-resolved ident objects
 			Indices: []ast.Expr{&ast.Ident{Name: "string"}, &ast.ArrayType{Elt: &ast.Ident{Name: "int"}}},
 		},
 		nil,
@@ -293,7 +293,7 @@ func TestGetGenericFieldType(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "test.Field[string,[]int]", field)
 
-	field, err = getFieldType(
+	_, err = getFieldType(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.IndexListExpr{
 			X:       &ast.BadExpr{},
@@ -303,10 +303,10 @@ func TestGetGenericFieldType(t *testing.T) {
 	)
 	assert.Error(t, err)
 
-	field, err = getFieldType(
+	_, err = getFieldType(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.IndexListExpr{
-			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}},
+			X:       &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}}, //nolint:staticcheck // test input relies on go/parser-resolved ident objects
 			Indices: []ast.Expr{&ast.Ident{Name: "string"}, &ast.ArrayType{Elt: &ast.BadExpr{}}},
 		},
 		nil,
@@ -321,21 +321,21 @@ func TestGetGenericFieldType(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "test.Field[string]", field)
 
-	field, err = getFieldType(
+	_, err = getFieldType(
 		&ast.File{Name: nil},
 		&ast.IndexExpr{X: &ast.Ident{Name: "Field"}, Index: &ast.Ident{Name: "string"}},
 		nil,
 	)
 	assert.Error(t, err)
 
-	field, err = getFieldType(
+	_, err = getFieldType(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.IndexExpr{X: &ast.BadExpr{}, Index: &ast.Ident{Name: "string"}},
 		nil,
 	)
 	assert.Error(t, err)
 
-	field, err = getFieldType(
+	_, err = getFieldType(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.IndexExpr{X: &ast.Ident{Name: "Field"}, Index: &ast.BadExpr{}},
 		nil,
@@ -354,14 +354,14 @@ func TestGetGenericFieldType(t *testing.T) {
 func TestGetGenericTypeName(t *testing.T) {
 	field, err := getGenericTypeName(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
-		&ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}},
+		&ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}}, //nolint:staticcheck // test input relies on go/parser-resolved ident objects
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, "test.Field", field)
 
 	field, err = getGenericTypeName(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
-		&ast.ArrayType{Elt: &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}}},
+		&ast.ArrayType{Elt: &ast.Ident{Name: "types", Obj: &ast.Object{Decl: &ast.TypeSpec{Name: &ast.Ident{Name: "Field"}}}}}, //nolint:staticcheck // test input relies on go/parser-resolved ident objects
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, "test.Field", field)
@@ -424,24 +424,24 @@ func TestParseGenericTypeExpr(t *testing.T) {
 	assert.NoError(t, err)
 
 	logger.Messages = []string{}
-	spec, err = parser.parseTypeExpr(
+	spec, _ = parser.parseTypeExpr(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.IndexExpr{X: &ast.BadExpr{}, Index: &ast.Ident{Name: "string"}},
 		false,
 	)
 	assert.NotNil(t, spec)
-	assert.Equal(t, "object", spec.SchemaProps.Type[0])
+	assert.Equal(t, "object", spec.Type[0])
 	assert.NotEmpty(t, logger.Messages)
 	assert.Len(t, logger.Messages, 1)
 
 	logger.Messages = []string{}
-	spec, err = parser.parseTypeExpr(
+	spec, _ = parser.parseTypeExpr(
 		&ast.File{Name: &ast.Ident{Name: "test"}},
 		&ast.BadExpr{},
 		false,
 	)
 	assert.NotNil(t, spec)
-	assert.Equal(t, "object", spec.SchemaProps.Type[0])
+	assert.Equal(t, "object", spec.Type[0])
 	assert.NotEmpty(t, logger.Messages)
 	assert.Len(t, logger.Messages, 1)
 }

@@ -22,7 +22,7 @@ func TestDefaultFieldParserV3(t *testing.T) {
 			}},
 		).ComplementSchema(schema)
 		assert.NoError(t, err)
-		assert.Equal(t, "one", schema.Spec.Example)
+		assert.Equal(t, "one", schema.Spec.Example) //nolint:staticcheck // test verifies the deprecated `example` field is still emitted
 
 		schema = spec.NewSchemaSpec()
 		schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
@@ -34,7 +34,7 @@ func TestDefaultFieldParserV3(t *testing.T) {
 			}},
 		).ComplementSchema(schema)
 		assert.NoError(t, err)
-		assert.Equal(t, "", schema.Spec.Example)
+		assert.Equal(t, "", schema.Spec.Example) //nolint:staticcheck // test verifies the deprecated `example` field is still emitted
 
 		schema = spec.NewSchemaSpec()
 		schema.Spec.Type = &spec.SingleOrArray[string]{"float"}
@@ -235,7 +235,7 @@ func TestDefaultFieldParserV3(t *testing.T) {
 				Value: `json:"test" enums:"d,e,f"`,
 			}},
 		)
-		fieldParser2.ComplementSchema(schema)
+		assert.NoError(t, fieldParser2.ComplementSchema(schema))
 		assert.Equal(t, []interface{}{"a", "b", "c", "d", "e", "f"}, schema.Spec.Enum)
 
 	})
@@ -273,7 +273,7 @@ func TestDefaultFieldParserV3(t *testing.T) {
 		assert.Equal(t, []interface{}{"image", "video"}, componentSchema.Spec.Enum)
 		assert.Equal(t, []string{"PostTypeImage", "PostTypeVideo"}, componentSchema.Spec.Extensions[enumVarNamesExtension])
 		if assert.NotNil(t, schema.Spec) {
-			assert.Equal(t, "video", schema.Spec.Example)
+			assert.Equal(t, "video", schema.Spec.Example) //nolint:staticcheck // test verifies the deprecated `example` field is still emitted
 			assert.Equal(t, "#/components/schemas/PostType", schema.Spec.Extensions["$ref"])
 			assert.Empty(t, schema.Spec.Enum)
 		}

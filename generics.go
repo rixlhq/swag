@@ -28,7 +28,7 @@ func (t *genericTypeSpec) TypeName() string {
 }
 
 func normalizeGenericTypeName(name string) string {
-	return strings.Replace(name, ".", "_", -1)
+	return strings.ReplaceAll(name, ".", "_")
 }
 
 func (pkgDefs *PackagesDefinitions) getTypeFromGenericParam(genericParam string, file *ast.File) (typeSpecDef *TypeSpecDef) {
@@ -117,7 +117,7 @@ func (pkgDefs *PackagesDefinitions) parametrizeGenericType(file *ast.File, origi
 		return original
 	}
 
-	name, genericParams := splitGenericsTypeName(fullGenericForm)
+	_, genericParams := splitGenericsTypeName(fullGenericForm)
 	if genericParams == nil {
 		return nil
 	}
@@ -155,7 +155,7 @@ func (pkgDefs *PackagesDefinitions) parametrizeGenericType(file *ast.File, origi
 		}
 	}
 
-	name = fmt.Sprintf("%s%s-", string(IgnoreNameOverridePrefix), original.TypeName())
+	name := fmt.Sprintf("%s%s-", string(IgnoreNameOverridePrefix), original.TypeName())
 	schemaName := fmt.Sprintf("%s-", original.SchemaName)
 
 	var nameParts []string
