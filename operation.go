@@ -821,7 +821,7 @@ func findTypeDef(importPath, typeName string) (*ast.TypeSpec, error) {
 	}
 
 	conf := &packages.Config{
-		Mode: packages.NeedName | packages.NeedSyntax,
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedSyntax,
 		Dir:  cwd,
 	}
 

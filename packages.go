@@ -562,7 +562,7 @@ func (pkgDefs *PackagesDefinitions) loadExternalPackage(importPath string) error
 	}
 
 	conf := &packages.Config{
-		Mode: packages.NeedName | packages.NeedSyntax | packages.NeedImports | packages.NeedDeps,
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedDeps | packages.NeedSyntax,
 		Dir:  cwd,
 	}
 
