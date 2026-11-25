@@ -2,6 +2,8 @@ module github.com/swaggo/swag/example/object-map-example
 
 go 1.25.0
 
+toolchain go1.27.3
+
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/swaggo/files v0.0.0-20210815190702-a29dd2bc99b2
